@@ -1,0 +1,12 @@
+*
+!target/*-runner
+!target/*-runner.jar
+!target/lib/*
+!target/quarkus-app/*
+
+# Allow essential build files and folders needed by the Docker build context
+!pom.xml
+!src/
+!mvnw
+!mvnw.cmd
+!.mvn/

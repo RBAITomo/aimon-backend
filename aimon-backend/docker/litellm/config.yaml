@@ -1,0 +1,22 @@
+# LiteLLM Proxy Configuration for aimon-backend
+# Primary model: Gemini 2.5 Flash via Google AI Studio
+
+model_list:
+  - model_name: gemini-2.5-flash
+    litellm_params:
+      model: gemini/gemini-2.5-flash
+      api_key: os.environ/GEMINI_API_KEY
+
+  - model_name: gemini-2.0-flash
+    litellm_params:
+      model: gemini/gemini-2.0-flash
+      api_key: os.environ/GEMINI_API_KEY
+
+# General settings
+litellm_settings:
+  drop_params: true
+  success_callback: []
+  failure_callback: []
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY

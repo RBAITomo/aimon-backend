@@ -1,0 +1,118 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: aimon-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: aimon
+      POSTGRES_USER: aimon
+      POSTGRES_PASSWORD: aimon
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aimon"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aimon-net
+
+  memoryservice:
+    build:
+      context: ../memoryService
+    container_name: aimon-memoryservice
+    ports:
+      - "8003:8003"
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: aimon
+      DB_USER: aimon
+      DB_PASSWORD: aimon
+      API_KEY: ${POWERMEM_API_KEY:-dev-powermem-api-key}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - aimon-net
+
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: aimon-litellm
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./docker/litellm/config.yaml:/app/config.yaml:ro
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    environment:
+      LITELLM_MASTER_KEY: ${LITELLM_API_KEY:-sk-1234}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+    networks:
+      - aimon-net
+
+  vieneu-tts:
+    build:
+      context: ../VieNeu-TTS
+      dockerfile: Dockerfile.api
+    container_name: aimon-vieneu-tts
+    ports:
+      - "5001:5001"
+    environment:
+      USE_FAST: "true"
+      BACKBONE_DEVICE: "auto"
+      CODEC_DEVICE: "auto"
+    volumes:
+      - huggingface_cache:/root/.cache/huggingface
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    networks:
+      - aimon-net
+
+  aimon-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.jvm
+    container_name: aimon-backend
+    ports:
+      - "8080:8080"
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: aimon
+      DB_USER: aimon
+      DB_PASSWORD: aimon
+      AI_LITELLM_BASE_URL: http://litellm:4000
+      AI_LITELLM_DEFAULT_MODEL: ${AI_LITELLM_DEFAULT_MODEL:-gemini-2.5-flash}
+      AI_LITELLM_API_KEY: ${LITELLM_API_KEY:-sk-1234}
+      AI_VIENEU_TTS_BASE_URL: http://vieneu-tts:5001
+      AI_VIENEU_TTS_ENABLED: ${AI_VIENEU_TTS_ENABLED:-true}
+      POWERMEM_BASE_URL: http://memoryservice:8003
+      POWERMEM_API_KEY: ${POWERMEM_API_KEY:-dev-powermem-api-key}
+      GOOGLE_CREDENTIALS_FILE: /app/google-credentials.json
+    volumes:
+      - ${GOOGLE_CREDENTIALS_PATH:-./google-credentials.json}:/app/google-credentials.json:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      memoryservice:
+        condition: service_started
+      litellm:
+        condition: service_started
+    networks:
+      - aimon-net
+
+volumes:
+  pgdata:
+    driver: local
+  huggingface_cache:
+    driver: local
+
+networks:
+  aimon-net:
+    driver: bridge
