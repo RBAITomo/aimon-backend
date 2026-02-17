@@ -1,53 +1,74 @@
-# Maven
-target/
-pom.xml.tag
-pom.xml.releaseBackup
-pom.xml.versionsBackup
-pom.xml.next
-release.properties
-dependency-reduced-pom.xml
-buildNumber.properties
-.mvn/timing.properties
-.mvn/wrapper/maven-wrapper.jar
-
-# Eclipse
-.project
-.classpath
-.settings/
-bin/
-
-# IntelliJ
-.idea/
-*.iml
-*.ipr
-*.iws
-
-# NetBeans
-nbproject/private/
-nbbuild/
-dist/
-nbdist/
-.nb-gradle/
-
-# VS Code
-.vscode/
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Quarkus
-.quarkus/
-
-# Credentials
-*.json
-!src/test/resources/*.json
-*.key
-*.pem
-*.p12
-dev-keystore.p12
-google-credentials.json
-
-# Environment
+﻿# Environment & Credentials
 .env
 .env.local
+.env.*.local
+*.key
+*.pem
+google-credentials.json
+service-account-key.json
+
+# API Keys & Secrets
+.env.production
+.env.development
+.env.test
+secrets.json
+credentials/
+
+# IDE & Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Node & Dependencies
+node_modules/
+package-lock.json
+yarn.lock
+.npm/
+
+# Build & Distribution
+dist/
+build/
+out/
+*.jar
+*.war
+*.ear
+
+# Quarkus
+target/
+.quarkus/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+postgres_data/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+
+# Temporary Files
+tmp/
+temp/
+.cache/
+.temp/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Docker
+.dockerignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
