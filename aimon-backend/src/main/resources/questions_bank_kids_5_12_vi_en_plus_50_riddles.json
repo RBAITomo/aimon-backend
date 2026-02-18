@@ -1,0 +1,1204 @@
+{
+  "questions": [
+    {
+      "code": "math_e_001",
+      "category": "math",
+      "difficulty": "easy",
+      "question": "3 cộng 4 bằng mấy?",
+      "answer": "7",
+      "hint": "Thử đếm 3 rồi thêm 4 nữa nhé."
+    },
+    {
+      "code": "math_e_002",
+      "category": "math",
+      "difficulty": "easy",
+      "question": "10 trừ 6 bằng mấy?",
+      "answer": "4",
+      "hint": "Lấy 10 rồi bớt đi 6."
+    },
+    {
+      "code": "math_e_003",
+      "category": "math",
+      "difficulty": "easy",
+      "question": "2 nhân 5 bằng mấy?",
+      "answer": "10",
+      "hint": "Nhân là cộng lặp lại: 5 + 5."
+    },
+    {
+      "code": "math_e_004",
+      "category": "math",
+      "difficulty": "easy",
+      "question": "12 chia 3 bằng mấy?",
+      "answer": "4",
+      "hint": "Chia là chia đều 12 thành 3 phần."
+    },
+    {
+      "code": "math_e_005",
+      "category": "math",
+      "difficulty": "easy",
+      "question": "Số nào lớn hơn: 9 hay 6?",
+      "answer": "9",
+      "hint": "So sánh hai số."
+    },
+    {
+      "code": "math_e_006",
+      "category": "math",
+      "difficulty": "easy",
+      "question": "Số nào bé hơn: 2 hay 5?",
+      "answer": "2",
+      "hint": "Nhìn chữ số hàng đơn vị."
+    },
+    {
+      "code": "math_e_007",
+      "category": "math",
+      "difficulty": "easy",
+      "question": "5 + 0 bằng mấy?",
+      "answer": "5",
+      "hint": "Cộng 0 thì không đổi."
+    },
+    {
+      "code": "math_e_008",
+      "category": "math",
+      "difficulty": "easy",
+      "question": "7 - 7 bằng mấy?",
+      "answer": "0",
+      "hint": "Trừ chính nó ra 0."
+    },
+    {
+      "code": "math_e_009",
+      "category": "math",
+      "difficulty": "easy",
+      "question": "Số liền sau của 19 là gì?",
+      "answer": "20",
+      "hint": "Đếm tiếp một bước."
+    },
+    {
+      "code": "math_e_010",
+      "category": "math",
+      "difficulty": "easy",
+      "question": "Số liền trước của 30 là gì?",
+      "answer": "29",
+      "hint": "Đếm lùi một bước."
+    },
+    {
+      "code": "math_m_001",
+      "category": "math",
+      "difficulty": "medium",
+      "question": "Nếu có 3 túi, mỗi túi 4 viên kẹo. Tổng có bao nhiêu viên?",
+      "answer": "12",
+      "hint": "3 nhóm, mỗi nhóm 4."
+    },
+    {
+      "code": "math_m_002",
+      "category": "math",
+      "difficulty": "medium",
+      "question": "Một hình vuông có mấy cạnh?",
+      "answer": "4",
+      "hint": "Đếm các cạnh quanh hình."
+    },
+    {
+      "code": "math_m_003",
+      "category": "math",
+      "difficulty": "medium",
+      "question": "Tìm số còn thiếu: 8 + __ = 15",
+      "answer": "7",
+      "hint": "15 - 8 = ?"
+    },
+    {
+      "code": "math_m_004",
+      "category": "math",
+      "difficulty": "medium",
+      "question": "Tìm số còn thiếu: __ - 9 = 6",
+      "answer": "15",
+      "hint": "Cộng ngược: 6 + 9."
+    },
+    {
+      "code": "math_m_005",
+      "category": "math",
+      "difficulty": "medium",
+      "question": "Số chẵn tiếp theo sau 14 là gì?",
+      "answer": "16",
+      "hint": "Số chẵn tăng thêm 2."
+    },
+    {
+      "code": "math_m_006",
+      "category": "math",
+      "difficulty": "medium",
+      "question": "25 là số chẵn hay lẻ?",
+      "answer": "lẻ",
+      "hint": "Nhìn chữ số tận cùng: 5."
+    },
+    {
+      "code": "math_m_007",
+      "category": "math",
+      "difficulty": "medium",
+      "question": "Trong 1 giờ có bao nhiêu phút?",
+      "answer": "60",
+      "hint": "Nhớ đồng hồ kim nha."
+    },
+    {
+      "code": "math_m_008",
+      "category": "math",
+      "difficulty": "medium",
+      "question": "Một tam giác có tổng mấy góc?",
+      "answer": "3",
+      "hint": "Tên gọi đã gợi ý rồi."
+    },
+    {
+      "code": "math_m_009",
+      "category": "math",
+      "difficulty": "medium",
+      "question": "Có 18 quả táo chia đều cho 6 bạn. Mỗi bạn được mấy quả?",
+      "answer": "3",
+      "hint": "Chia đều: 18 : 6."
+    },
+    {
+      "code": "math_m_010",
+      "category": "math",
+      "difficulty": "medium",
+      "question": "Chu vi hình chữ nhật 3cm x 5cm là bao nhiêu cm?",
+      "answer": "16",
+      "hint": "Chu vi = 2*(dài + rộng)."
+    },
+    {
+      "code": "math_h_001",
+      "category": "math",
+      "difficulty": "hard",
+      "question": "Một cửa hàng bán 6 chiếc bút, mỗi chiếc 7.000đ. Tổng tiền là bao nhiêu?",
+      "answer": "42000",
+      "hint": "6 x 7000."
+    },
+    {
+      "code": "math_h_002",
+      "category": "math",
+      "difficulty": "hard",
+      "question": "Tìm ước chung lớn nhất của 12 và 18.",
+      "answer": "6",
+      "hint": "Liệt kê ước của từng số."
+    },
+    {
+      "code": "math_h_003",
+      "category": "math",
+      "difficulty": "hard",
+      "question": "Tìm bội chung nhỏ nhất của 4 và 6.",
+      "answer": "12",
+      "hint": "Tìm số nhỏ nhất chia hết cho cả 4 và 6."
+    },
+    {
+      "code": "math_h_004",
+      "category": "math",
+      "difficulty": "hard",
+      "question": "Phân số nào lớn hơn: 3/4 hay 2/3?",
+      "answer": "3/4",
+      "hint": "So sánh bằng nhân chéo: 3*3 và 2*4."
+    },
+    {
+      "code": "math_h_005",
+      "category": "math",
+      "difficulty": "hard",
+      "question": "Một hình chữ nhật có chu vi 30cm, rộng 6cm. Dài bao nhiêu cm?",
+      "answer": "9",
+      "hint": "30 = 2*(dài + 6)."
+    },
+    {
+      "code": "sci_e_001",
+      "category": "science",
+      "difficulty": "easy",
+      "question": "Mặt Trời là ngôi sao hay hành tinh?",
+      "answer": "ngôi sao",
+      "hint": "Mặt Trời tự phát sáng."
+    },
+    {
+      "code": "sci_e_002",
+      "category": "science",
+      "difficulty": "easy",
+      "question": "Cây cần gì để lớn lên: ánh sáng hay bóng tối?",
+      "answer": "ánh sáng",
+      "hint": "Cây quang hợp nhờ ánh sáng."
+    },
+    {
+      "code": "sci_e_003",
+      "category": "science",
+      "difficulty": "easy",
+      "question": "Nước có thể tồn tại ở mấy trạng thái cơ bản (rắn, lỏng, khí)?",
+      "answer": "3",
+      "hint": "Đá, nước, hơi nước."
+    },
+    {
+      "code": "sci_e_004",
+      "category": "science",
+      "difficulty": "easy",
+      "question": "Con người hít vào khí gì để thở?",
+      "answer": "ôxy",
+      "hint": "O2 giúp cơ thể tạo năng lượng."
+    },
+    {
+      "code": "sci_e_005",
+      "category": "science",
+      "difficulty": "easy",
+      "question": "Con vật nào thường sống dưới nước: cá hay mèo?",
+      "answer": "cá",
+      "hint": "Cá có mang để thở trong nước."
+    },
+    {
+      "code": "sci_e_006",
+      "category": "science",
+      "difficulty": "easy",
+      "question": "Cầu vồng thường xuất hiện sau khi trời có gì?",
+      "answer": "mưa",
+      "hint": "Kết hợp mưa và nắng."
+    },
+    {
+      "code": "sci_e_007",
+      "category": "science",
+      "difficulty": "easy",
+      "question": "Trái Đất quay quanh gì?",
+      "answer": "Mặt Trời",
+      "hint": "Hệ Mặt Trời có trung tâm là Mặt Trời."
+    },
+    {
+      "code": "sci_e_008",
+      "category": "science",
+      "difficulty": "easy",
+      "question": "Băng là nước ở trạng thái gì?",
+      "answer": "rắn",
+      "hint": "Băng cứng và lạnh."
+    },
+    {
+      "code": "sci_e_009",
+      "category": "science",
+      "difficulty": "easy",
+      "question": "Loài vật nào đẻ trứng: gà hay bò?",
+      "answer": "gà",
+      "hint": "Gà là loài chim."
+    },
+    {
+      "code": "sci_e_010",
+      "category": "science",
+      "difficulty": "easy",
+      "question": "Lá cây thường có màu gì?",
+      "answer": "xanh",
+      "hint": "Do chất diệp lục."
+    },
+    {
+      "code": "sci_m_001",
+      "category": "science",
+      "difficulty": "medium",
+      "question": "Vì sao ban ngày sáng hơn ban đêm?",
+      "answer": "Vì Mặt Trời chiếu sáng Trái Đất.",
+      "hint": "Ban ngày nơi đó hướng về Mặt Trời."
+    },
+    {
+      "code": "sci_m_002",
+      "category": "science",
+      "difficulty": "medium",
+      "question": "Bộ phận nào của cây hút nước từ đất?",
+      "answer": "rễ",
+      "hint": "Rễ nằm dưới đất."
+    },
+    {
+      "code": "sci_m_003",
+      "category": "science",
+      "difficulty": "medium",
+      "question": "Hệ Mặt Trời có bao nhiêu hành tinh (theo kiến thức hiện nay)?",
+      "answer": "8",
+      "hint": "Từ Sao Thủy đến Sao Hải Vương."
+    },
+    {
+      "code": "sci_m_004",
+      "category": "science",
+      "difficulty": "medium",
+      "question": "Máu trong cơ thể được bơm bởi cơ quan nào?",
+      "answer": "tim",
+      "hint": "Tim co bóp như cái bơm."
+    },
+    {
+      "code": "sci_m_005",
+      "category": "science",
+      "difficulty": "medium",
+      "question": "Khi nước sôi, nó chuyển từ lỏng sang gì?",
+      "answer": "khí",
+      "hint": "Tạo hơi nước bay lên."
+    },
+    {
+      "code": "sci_m_006",
+      "category": "science",
+      "difficulty": "medium",
+      "question": "Động vật ăn thịt gọi là gì?",
+      "answer": "động vật ăn thịt (carnivore)",
+      "hint": "Ví dụ: sư tử, hổ."
+    },
+    {
+      "code": "sci_m_007",
+      "category": "science",
+      "difficulty": "medium",
+      "question": "Tại sao cần rửa tay trước khi ăn?",
+      "answer": "Để loại bỏ vi khuẩn/germs.",
+      "hint": "Vi khuẩn có thể gây bệnh."
+    },
+    {
+      "code": "sci_m_008",
+      "category": "science",
+      "difficulty": "medium",
+      "question": "Năng lượng từ gió dùng để làm gì trong thực tế?",
+      "answer": "tạo điện (điện gió)",
+      "hint": "Tua-bin gió quay phát điện."
+    },
+    {
+      "code": "sci_m_009",
+      "category": "science",
+      "difficulty": "medium",
+      "question": "Loài nào là động vật có vú: cá voi hay cá mập?",
+      "answer": "cá voi",
+      "hint": "Cá voi thở bằng phổi."
+    },
+    {
+      "code": "sci_m_010",
+      "category": "science",
+      "difficulty": "medium",
+      "question": "Vì sao chúng ta nghe được âm thanh?",
+      "answer": "Vì rung động truyền qua không khí đến tai.",
+      "hint": "Âm thanh là sự rung động."
+    },
+    {
+      "code": "phy_e_001",
+      "category": "physics",
+      "difficulty": "easy",
+      "question": "Vật nào rơi xuống đất nhanh hơn (bỏ qua gió): viên bi hay chiếc lá?",
+      "answer": "viên bi",
+      "hint": "Lá bị cản bởi không khí."
+    },
+    {
+      "code": "phy_e_002",
+      "category": "physics",
+      "difficulty": "easy",
+      "question": "Lực hút của Trái Đất gọi là gì?",
+      "answer": "trọng lực",
+      "hint": "Kéo mọi thứ xuống dưới."
+    },
+    {
+      "code": "phy_e_003",
+      "category": "physics",
+      "difficulty": "easy",
+      "question": "Nam châm hút vật làm bằng chất gì: sắt hay gỗ?",
+      "answer": "sắt",
+      "hint": "Đinh sắt bị hút mạnh."
+    },
+    {
+      "code": "phy_e_004",
+      "category": "physics",
+      "difficulty": "easy",
+      "question": "Đèn pin sáng nhờ nguồn năng lượng nào?",
+      "answer": "pin (điện)",
+      "hint": "Pin tạo dòng điện."
+    },
+    {
+      "code": "phy_e_005",
+      "category": "physics",
+      "difficulty": "easy",
+      "question": "Âm thanh truyền được trong không khí hay chân không?",
+      "answer": "không khí",
+      "hint": "Cần môi trường để truyền."
+    },
+    {
+      "code": "phy_m_001",
+      "category": "physics",
+      "difficulty": "medium",
+      "question": "Nếu đẩy một chiếc xe đồ chơi mạnh hơn thì nó sẽ đi như thế nào?",
+      "answer": "Đi nhanh hơn và xa hơn.",
+      "hint": "Lực lớn hơn → chuyển động mạnh hơn."
+    },
+    {
+      "code": "phy_m_002",
+      "category": "physics",
+      "difficulty": "medium",
+      "question": "Khi trời nóng, nước trong ly để lâu sẽ?",
+      "answer": "bay hơi dần",
+      "hint": "Nhiệt làm nước chuyển thành hơi."
+    },
+    {
+      "code": "phy_m_003",
+      "category": "physics",
+      "difficulty": "medium",
+      "question": "Bóng đèn sợi đốt phát sáng vì gì?",
+      "answer": "dòng điện làm sợi đốt nóng sáng",
+      "hint": "Nóng lên thì phát sáng."
+    },
+    {
+      "code": "phy_m_004",
+      "category": "physics",
+      "difficulty": "medium",
+      "question": "Tại sao khi phanh xe, người ngồi có xu hướng lao về phía trước?",
+      "answer": "do quán tính",
+      "hint": "Cơ thể muốn giữ chuyển động cũ."
+    },
+    {
+      "code": "phy_m_005",
+      "category": "physics",
+      "difficulty": "medium",
+      "question": "Trong mạch điện đơn giản, để đèn sáng cần mạch kín hay mạch hở?",
+      "answer": "mạch kín",
+      "hint": "Dòng điện phải chạy vòng kín."
+    },
+    {
+      "code": "phy_h_001",
+      "category": "physics",
+      "difficulty": "hard",
+      "question": "Âm thanh to hay nhỏ phụ thuộc nhiều vào đại lượng nào của sóng âm?",
+      "answer": "biên độ",
+      "hint": "Biên độ lớn → âm to."
+    },
+    {
+      "code": "phy_h_002",
+      "category": "physics",
+      "difficulty": "hard",
+      "question": "Vận tốc = quãng đường / thời gian. Nếu đi 60km trong 2 giờ, vận tốc là bao nhiêu km/h?",
+      "answer": "30",
+      "hint": "60 / 2."
+    },
+    {
+      "code": "phy_h_003",
+      "category": "physics",
+      "difficulty": "hard",
+      "question": "Tại sao bầu trời nhìn thường có màu xanh?",
+      "answer": "Do tán xạ ánh sáng xanh trong khí quyển.",
+      "hint": "Ánh sáng xanh bị tán xạ mạnh hơn."
+    },
+    {
+      "code": "phy_h_004",
+      "category": "physics",
+      "difficulty": "hard",
+      "question": "Nếu một vật nổi trên nước, lực đẩy Ác-si-mét so với trọng lực của vật như thế nào?",
+      "answer": "bằng nhau",
+      "hint": "Cân bằng thì nổi đứng yên."
+    },
+    {
+      "code": "phy_h_005",
+      "category": "physics",
+      "difficulty": "hard",
+      "question": "Trong đòn bẩy, để nâng vật nặng dễ hơn, ta nên đặt điểm tựa gần vật hay gần tay?",
+      "answer": "gần vật",
+      "hint": "Tăng cánh tay đòn phía lực tác dụng."
+    },
+    {
+      "code": "eng_e_001",
+      "category": "english",
+      "difficulty": "easy",
+      "question": "What color is the sky on a clear day?",
+      "answer": "blue",
+      "hint": "It looks like the ocean color!"
+    },
+    {
+      "code": "eng_e_002",
+      "category": "english",
+      "difficulty": "easy",
+      "question": "Chọn từ đúng: I ___ a cat. (have/has)",
+      "answer": "have",
+      "hint": "Chủ ngữ 'I' đi với 'have'."
+    },
+    {
+      "code": "eng_e_003",
+      "category": "english",
+      "difficulty": "easy",
+      "question": "Translate to Vietnamese: 'Hello!'",
+      "answer": "Xin chào!",
+      "hint": "Câu chào quen thuộc nhất."
+    },
+    {
+      "code": "eng_e_004",
+      "category": "english",
+      "difficulty": "easy",
+      "question": "Fill in the blank: She ___ to school. (go/goes)",
+      "answer": "goes",
+      "hint": "He/She/It + V-s/es."
+    },
+    {
+      "code": "eng_e_005",
+      "category": "english",
+      "difficulty": "easy",
+      "question": "What is the plural of 'book'?",
+      "answer": "books",
+      "hint": "Thêm -s vào cuối."
+    },
+    {
+      "code": "eng_e_006",
+      "category": "english",
+      "difficulty": "easy",
+      "question": "Translate to English: 'cảm ơn'",
+      "answer": "thank you",
+      "hint": "Hai từ rất lịch sự."
+    },
+    {
+      "code": "eng_e_007",
+      "category": "english",
+      "difficulty": "easy",
+      "question": "Choose the correct article: ___ apple (a/an)",
+      "answer": "an",
+      "hint": "Apple bắt đầu bằng nguyên âm."
+    },
+    {
+      "code": "eng_e_008",
+      "category": "english",
+      "difficulty": "easy",
+      "question": "What is the opposite of 'big'?",
+      "answer": "small",
+      "hint": "Từ trái nghĩa hay gặp."
+    },
+    {
+      "code": "eng_e_009",
+      "category": "english",
+      "difficulty": "easy",
+      "question": "Fill in: They ___ happy. (is/are)",
+      "answer": "are",
+      "hint": "They luôn đi với are."
+    },
+    {
+      "code": "eng_e_010",
+      "category": "english",
+      "difficulty": "easy",
+      "question": "Spell the word: con mèo (in English)",
+      "answer": "cat",
+      "hint": "3 chữ cái thôi nè!"
+    },
+    {
+      "code": "eng_m_001",
+      "category": "english",
+      "difficulty": "medium",
+      "question": "Choose the correct tense: Yesterday, I ___ a movie. (watch/watched)",
+      "answer": "watched",
+      "hint": "Yesterday → quá khứ."
+    },
+    {
+      "code": "eng_m_002",
+      "category": "english",
+      "difficulty": "medium",
+      "question": "Translate to English: 'Tôi thích đọc sách.'",
+      "answer": "I like reading books.",
+      "hint": "Like + V-ing."
+    },
+    {
+      "code": "eng_m_003",
+      "category": "english",
+      "difficulty": "medium",
+      "question": "Pick the correct word: There ___ two dogs. (is/are)",
+      "answer": "are",
+      "hint": "Two → số nhiều."
+    },
+    {
+      "code": "eng_m_004",
+      "category": "english",
+      "difficulty": "medium",
+      "question": "What does 'because' mean in Vietnamese?",
+      "answer": "bởi vì",
+      "hint": "Nối lý do."
+    },
+    {
+      "code": "eng_m_005",
+      "category": "english",
+      "difficulty": "medium",
+      "question": "Complete: Can you ___ me? (help/helps)",
+      "answer": "help",
+      "hint": "Sau 'can' dùng động từ nguyên mẫu."
+    },
+    {
+      "code": "eng_m_006",
+      "category": "english",
+      "difficulty": "medium",
+      "question": "Choose: My mother is ___ teacher. (a/an)",
+      "answer": "a",
+      "hint": "Teacher bắt đầu bằng phụ âm /t/."
+    },
+    {
+      "code": "eng_m_007",
+      "category": "english",
+      "difficulty": "medium",
+      "question": "Make it plural: 'child'",
+      "answer": "children",
+      "hint": "Danh từ bất quy tắc."
+    },
+    {
+      "code": "eng_m_008",
+      "category": "english",
+      "difficulty": "medium",
+      "question": "What is the past of 'go'?",
+      "answer": "went",
+      "hint": "Bất quy tắc, không thêm -ed."
+    },
+    {
+      "code": "eng_m_009",
+      "category": "english",
+      "difficulty": "medium",
+      "question": "Fill in preposition: The book is ___ the table. (on/in)",
+      "answer": "on",
+      "hint": "Trên mặt bàn."
+    },
+    {
+      "code": "eng_m_010",
+      "category": "english",
+      "difficulty": "medium",
+      "question": "Meaning of 'hungry'?",
+      "answer": "đói",
+      "hint": "Cảm giác cần ăn."
+    },
+    {
+      "code": "vn_e_001",
+      "category": "vietnamese",
+      "difficulty": "easy",
+      "question": "Trong bảng chữ cái tiếng Việt có bao nhiêu chữ cái?",
+      "answer": "29",
+      "hint": "A, Ă, Â... đến Y."
+    },
+    {
+      "code": "vn_e_002",
+      "category": "vietnamese",
+      "difficulty": "easy",
+      "question": "Từ nào là danh từ: 'chạy' hay 'quyển sách'?",
+      "answer": "quyển sách",
+      "hint": "Danh từ gọi tên sự vật."
+    },
+    {
+      "code": "vn_e_003",
+      "category": "vietnamese",
+      "difficulty": "easy",
+      "question": "Điền dấu câu: Con mèo kêu ___",
+      "answer": "meo meo!",
+      "hint": "Cuối câu cảm thán thường có !"
+    },
+    {
+      "code": "vn_e_004",
+      "category": "vietnamese",
+      "difficulty": "easy",
+      "question": "Tìm từ trái nghĩa của 'nóng'.",
+      "answer": "lạnh",
+      "hint": "Hai từ hay đi cùng nhau."
+    },
+    {
+      "code": "vn_e_005",
+      "category": "vietnamese",
+      "difficulty": "easy",
+      "question": "Chữ nào đứng sau chữ 'H' trong bảng chữ cái Latin?",
+      "answer": "I",
+      "hint": "Đếm tiếp một chữ."
+    },
+    {
+      "code": "vn_m_001",
+      "category": "vietnamese",
+      "difficulty": "medium",
+      "question": "Tìm từ đồng nghĩa gần nhất của 'vui vẻ'.",
+      "answer": "hạnh phúc",
+      "hint": "Từ mang cảm xúc tích cực."
+    },
+    {
+      "code": "vn_m_002",
+      "category": "vietnamese",
+      "difficulty": "medium",
+      "question": "Câu nào đúng chính tả: 'xung quanh' hay 'xung qanh'?",
+      "answer": "xung quanh",
+      "hint": "Nhớ có 'u'."
+    },
+    {
+      "code": "vn_m_003",
+      "category": "vietnamese",
+      "difficulty": "medium",
+      "question": "Hãy tìm chủ ngữ trong câu: 'Bạn Lan đang đọc sách.'",
+      "answer": "Bạn Lan",
+      "hint": "Ai đang làm gì?"
+    },
+    {
+      "code": "vn_m_004",
+      "category": "vietnamese",
+      "difficulty": "medium",
+      "question": "Một đoạn văn thường gồm mấy câu trở lên?",
+      "answer": "từ 2 câu trở lên",
+      "hint": "Ít nhất phải có hơn 1 câu."
+    },
+    {
+      "code": "vn_m_005",
+      "category": "vietnamese",
+      "difficulty": "medium",
+      "question": "Tìm ẩn dụ đơn giản: 'Mặt trời của mẹ' nói về ai?",
+      "answer": "con",
+      "hint": "Con là niềm vui của mẹ."
+    },
+    {
+      "code": "vn_h_001",
+      "category": "vietnamese",
+      "difficulty": "hard",
+      "question": "Sắp xếp theo thứ tự ABC: cam, táo, bưởi, nho.",
+      "answer": "bưởi, cam, nho, táo",
+      "hint": "So chữ cái đầu: b-c-n-t."
+    },
+    {
+      "code": "vn_h_002",
+      "category": "vietnamese",
+      "difficulty": "hard",
+      "question": "Trong câu 'Vì trời mưa nên em mang áo mưa', từ nối quan hệ là gì?",
+      "answer": "vì...nên",
+      "hint": "Cặp từ chỉ nguyên nhân-kết quả."
+    },
+    {
+      "code": "vn_h_003",
+      "category": "vietnamese",
+      "difficulty": "hard",
+      "question": "Tìm một từ láy trong câu: 'Cơn mưa rơi lộp độp trên mái.'",
+      "answer": "lộp độp",
+      "hint": "Từ lặp âm nghe vui tai."
+    },
+    {
+      "code": "vn_h_004",
+      "category": "vietnamese",
+      "difficulty": "hard",
+      "question": "Chuyển câu chủ động sang bị động: 'Bé Nam đá quả bóng.'",
+      "answer": "Quả bóng được bé Nam đá.",
+      "hint": "Thêm 'được' hoặc 'bị'."
+    },
+    {
+      "code": "vn_h_005",
+      "category": "vietnamese",
+      "difficulty": "hard",
+      "question": "Tìm thành phần trạng ngữ trong câu: 'Buổi sáng, em đi học.'",
+      "answer": "Buổi sáng",
+      "hint": "Trả lời câu hỏi 'khi nào?'."
+    },
+    {
+      "code": "gk_e_001",
+      "category": "general_knowledge",
+      "difficulty": "easy",
+      "question": "Thủ đô của Việt Nam là thành phố nào?",
+      "answer": "Hà Nội",
+      "hint": "Nơi có Hồ Gươm đó!"
+    },
+    {
+      "code": "gk_e_002",
+      "category": "general_knowledge",
+      "difficulty": "easy",
+      "question": "Việt Nam có bao nhiêu mùa ở miền Bắc?",
+      "answer": "4",
+      "hint": "Xuân - Hạ - Thu - Đông."
+    },
+    {
+      "code": "gk_m_001",
+      "category": "general_knowledge",
+      "difficulty": "medium",
+      "question": "Châu lục nào lớn nhất thế giới?",
+      "answer": "Châu Á",
+      "hint": "Nơi có Việt Nam nữa."
+    },
+    {
+      "code": "gk_m_002",
+      "category": "general_knowledge",
+      "difficulty": "medium",
+      "question": "Ai là người phát minh ra bóng đèn sợi đốt (thường được nhắc đến trong sách)?",
+      "answer": "Thomas Edison",
+      "hint": "Ông nổi tiếng với nhiều phát minh."
+    },
+    {
+      "code": "gk_h_001",
+      "category": "general_knowledge",
+      "difficulty": "hard",
+      "question": "Trái Đất mất khoảng bao lâu để quay hết một vòng quanh Mặt Trời?",
+      "answer": "khoảng 365 ngày",
+      "hint": "Một năm đó!"
+    },
+    {
+      "code": "riddle_001",
+      "category": "riddle",
+      "difficulty": "easy",
+      "question": "Cái gì càng lấy đi càng lớn?",
+      "answer": "cái hố",
+      "hint": "Nghĩ về việc đào đất nhé."
+    },
+    {
+      "code": "riddle_002",
+      "category": "riddle",
+      "difficulty": "easy",
+      "question": "Cái gì có răng nhưng không biết cắn?",
+      "answer": "cái lược",
+      "hint": "Dùng để chải tóc đó."
+    },
+    {
+      "code": "riddle_003",
+      "category": "riddle",
+      "difficulty": "easy",
+      "question": "Cái gì đi khắp thế giới mà vẫn ở một chỗ?",
+      "answer": "con tem",
+      "hint": "Nó nằm trên phong bì."
+    },
+    {
+      "code": "riddle_004",
+      "category": "riddle",
+      "difficulty": "medium",
+      "question": "Cái gì có mặt và có tay nhưng không có chân?",
+      "answer": "cái đồng hồ",
+      "hint": "Nó chỉ giờ."
+    },
+    {
+      "code": "riddle_005",
+      "category": "riddle",
+      "difficulty": "easy",
+      "question": "Cái gì có cổ mà không có đầu?",
+      "answer": "cái áo",
+      "hint": "Áo có cổ áo."
+    },
+    {
+      "code": "riddle_006",
+      "category": "riddle",
+      "difficulty": "medium",
+      "question": "Cái gì càng chạy càng chậm?",
+      "answer": "đồng hồ cát",
+      "hint": "Cát chảy dần xuống."
+    },
+    {
+      "code": "riddle_007",
+      "category": "riddle",
+      "difficulty": "medium",
+      "question": "Cái gì luôn đi đến nhưng không bao giờ đến nơi?",
+      "answer": "ngày mai",
+      "hint": "Nó luôn ở phía trước."
+    },
+    {
+      "code": "riddle_008",
+      "category": "riddle",
+      "difficulty": "easy",
+      "question": "Con gì mang được miếng gỗ lớn mà không mang được hòn sỏi nhỏ?",
+      "answer": "con sông",
+      "hint": "Dòng nước cuốn trôi được gì?"
+    },
+    {
+      "code": "riddle_009",
+      "category": "riddle",
+      "difficulty": "easy",
+      "question": "Cái gì có chìa mà không mở được khóa?",
+      "answer": "đàn piano",
+      "hint": "Phím đàn gọi là 'chìa'."
+    },
+    {
+      "code": "riddle_010",
+      "category": "riddle",
+      "difficulty": "medium",
+      "question": "Cái gì có mắt mà không thấy đường?",
+      "answer": "củ khoai tây",
+      "hint": "Trên củ có 'mắt' nảy mầm."
+    },
+    {
+      "code": "riddle_011",
+      "category": "riddle",
+      "difficulty": "medium",
+      "question": "Cái gì có thân nhưng không có chân tay?",
+      "answer": "cái cây",
+      "hint": "Cây có thân cây."
+    },
+    {
+      "code": "riddle_012",
+      "category": "riddle",
+      "difficulty": "medium",
+      "question": "Cái gì có đầu và đuôi nhưng không có thân?",
+      "answer": "đồng xu",
+      "hint": "Có mặt trước và mặt sau."
+    },
+    {
+      "code": "riddle_013",
+      "category": "riddle",
+      "difficulty": "easy",
+      "question": "Cái gì càng ăn càng gầy?",
+      "answer": "lửa",
+      "hint": "Cho củi vào thì sao?"
+    },
+    {
+      "code": "riddle_014",
+      "category": "riddle",
+      "difficulty": "medium",
+      "question": "Cái gì bạn giữ càng chặt thì càng dễ tuột mất?",
+      "answer": "cát",
+      "hint": "Nắm càng chặt cát càng rơi."
+    },
+    {
+      "code": "riddle_015",
+      "category": "riddle",
+      "difficulty": "medium",
+      "question": "Cái gì không có miệng mà vẫn có thể 'kêu'?",
+      "answer": "chuông",
+      "hint": "Rung lên là kêu."
+    },
+    {
+      "code": "riddle_016",
+      "category": "riddle",
+      "difficulty": "medium",
+      "question": "Cái gì có nhiều lỗ nhưng vẫn giữ được nước?",
+      "answer": "miếng bọt biển",
+      "hint": "Bọt biển hút nước."
+    },
+    {
+      "code": "riddle_017",
+      "category": "riddle",
+      "difficulty": "easy",
+      "question": "Cái gì có thể bay nhưng không có cánh?",
+      "answer": "thời gian",
+      "hint": "Nó trôi rất nhanh."
+    },
+    {
+      "code": "riddle_018",
+      "category": "riddle",
+      "difficulty": "easy",
+      "question": "Cái gì ướt khi đang làm khô?",
+      "answer": "khăn tắm",
+      "hint": "Dùng để lau người."
+    },
+    {
+      "code": "riddle_019",
+      "category": "riddle",
+      "difficulty": "medium",
+      "question": "Cái gì có thể đầy lên nhưng không nặng thêm?",
+      "answer": "cái hố",
+      "hint": "Đầy đất thì nhẹ hơn à?"
+    },
+    {
+      "code": "riddle_020",
+      "category": "riddle",
+      "difficulty": "medium",
+      "question": "Cái gì bạn thấy ban đêm mà ban ngày không thấy?",
+      "answer": "ngôi sao",
+      "hint": "Ban ngày bị nắng che."
+    },
+    {
+      "code": "riddle_021",
+      "category": "riddle",
+      "difficulty": "medium",
+      "question": "Cái gì càng nhiều càng ít thấy?",
+      "answer": "sương mù",
+      "hint": "Dày thì nhìn kém."
+    },
+    {
+      "code": "riddle_022",
+      "category": "riddle",
+      "difficulty": "medium",
+      "question": "Con gì có thể đứng mà không thể ngồi?",
+      "answer": "con ngựa (tượng cờ)",
+      "hint": "Trong cờ vua ngựa không 'ngồi'."
+    },
+    {
+      "code": "riddle_023",
+      "category": "riddle",
+      "difficulty": "medium",
+      "question": "Cái gì có thể mở ra mà không phải cửa?",
+      "answer": "quyển sách",
+      "hint": "Mở sách để đọc."
+    },
+    {
+      "code": "riddle_024",
+      "category": "riddle",
+      "difficulty": "medium",
+      "question": "Cái gì có thể gãy mà không cần chạm vào?",
+      "answer": "lời hứa",
+      "hint": "Chỉ cần không giữ lời."
+    },
+    {
+      "code": "riddle_025",
+      "category": "riddle",
+      "difficulty": "medium",
+      "question": "Cái gì có thể rơi mà không bị đau?",
+      "answer": "mưa",
+      "hint": "Hạt mưa rơi xuống."
+    },
+    {
+      "code": "riddle_026",
+      "category": "riddle",
+      "difficulty": "medium",
+      "question": "Cái gì bạn càng cho người khác càng có nhiều?",
+      "answer": "nụ cười",
+      "hint": "Cười lan tỏa!"
+    },
+    {
+      "code": "riddle_027",
+      "category": "riddle",
+      "difficulty": "medium",
+      "question": "Cái gì luôn ở phía trước bạn nhưng bạn không bao giờ chạm tới?",
+      "answer": "tương lai",
+      "hint": "Nó chưa tới."
+    },
+    {
+      "code": "riddle_028",
+      "category": "riddle",
+      "difficulty": "medium",
+      "question": "Cái gì càng lạnh càng chạy nhanh?",
+      "answer": "mũi (chảy nước mũi)",
+      "hint": "Lạnh là chảy!"
+    },
+    {
+      "code": "riddle_029",
+      "category": "riddle",
+      "difficulty": "medium",
+      "question": "Cái gì có thể nói mà không có miệng?",
+      "answer": "tiếng vọng",
+      "hint": "Âm dội lại."
+    },
+    {
+      "code": "riddle_030",
+      "category": "riddle",
+      "difficulty": "medium",
+      "question": "Cái gì có thể viết mà không có tay?",
+      "answer": "bút",
+      "hint": "Bút viết nhờ người cầm."
+    },
+    {
+      "code": "riddle_031",
+      "category": "riddle",
+      "difficulty": "medium",
+      "question": "Cái gì có thể nghe mà không có tai?",
+      "answer": "điện thoại",
+      "hint": "Nó nhận âm thanh."
+    },
+    {
+      "code": "riddle_032",
+      "category": "riddle",
+      "difficulty": "medium",
+      "question": "Cái gì có thể 'nuốt' nước mà không bao giờ no?",
+      "answer": "đất",
+      "hint": "Đất thấm nước."
+    },
+    {
+      "code": "riddle_033",
+      "category": "riddle",
+      "difficulty": "medium",
+      "question": "Cái gì ở dưới nước mà không ướt?",
+      "answer": "bóng của bạn",
+      "hint": "Bóng không ướt."
+    },
+    {
+      "code": "riddle_034",
+      "category": "riddle",
+      "difficulty": "easy",
+      "question": "Cái gì càng cao càng thấy lạnh?",
+      "answer": "núi",
+      "hint": "Lên cao nhiệt độ giảm."
+    },
+    {
+      "code": "riddle_035",
+      "category": "riddle",
+      "difficulty": "medium",
+      "question": "Cái gì có thể đi lên mà không bao giờ đi xuống?",
+      "answer": "tuổi",
+      "hint": "Tuổi chỉ tăng."
+    },
+    {
+      "code": "riddle_036",
+      "category": "riddle",
+      "difficulty": "medium",
+      "question": "Cái gì có thể đi xuống mà không bao giờ đi lên?",
+      "answer": "mưa",
+      "hint": "Mưa rơi xuống."
+    },
+    {
+      "code": "riddle_037",
+      "category": "riddle",
+      "difficulty": "medium",
+      "question": "Cái gì có thể cắt nhưng không có dao?",
+      "answer": "gió",
+      "hint": "Gió 'cắt da cắt thịt'."
+    },
+    {
+      "code": "riddle_038",
+      "category": "riddle",
+      "difficulty": "easy",
+      "question": "Cái gì có thể chạy mà không có chân?",
+      "answer": "nước",
+      "hint": "Nước chảy."
+    },
+    {
+      "code": "riddle_039",
+      "category": "riddle",
+      "difficulty": "medium",
+      "question": "Cái gì có thể đếm được nhưng không nhìn thấy?",
+      "answer": "số",
+      "hint": "Số là khái niệm."
+    },
+    {
+      "code": "riddle_040",
+      "category": "riddle",
+      "difficulty": "medium",
+      "question": "Cái gì có thể to lên mà không thổi?",
+      "answer": "bóng tối",
+      "hint": "Đêm xuống bóng tối lớn."
+    },
+    {
+      "code": "riddle_041",
+      "category": "riddle",
+      "difficulty": "medium",
+      "question": "Cái gì có thể mất đi khi bạn nói tên nó?",
+      "answer": "sự im lặng",
+      "hint": "Nói là hết im lặng."
+    },
+    {
+      "code": "riddle_042",
+      "category": "riddle",
+      "difficulty": "medium",
+      "question": "Cái gì có thể nở mà không phải hoa?",
+      "answer": "nụ cười",
+      "hint": "Cười tươi như hoa."
+    },
+    {
+      "code": "riddle_043",
+      "category": "riddle",
+      "difficulty": "easy",
+      "question": "Cái gì có thể khóa mà không cần ổ khóa?",
+      "answer": "màn hình điện thoại",
+      "hint": "Khóa màn hình."
+    },
+    {
+      "code": "riddle_044",
+      "category": "riddle",
+      "difficulty": "medium",
+      "question": "Cái gì có thể rót mà không có nước?",
+      "answer": "rót lời",
+      "hint": "Rót lời ngọt ngào (ẩn dụ)."
+    },
+    {
+      "code": "riddle_045",
+      "category": "riddle",
+      "difficulty": "medium",
+      "question": "Cái gì có thể sáng mà không có đèn?",
+      "answer": "mặt trăng",
+      "hint": "Phản chiếu ánh sáng mặt trời."
+    },
+    {
+      "code": "riddle_046",
+      "category": "riddle",
+      "difficulty": "easy",
+      "question": "Cái gì có thể 'đọc' mà không có mắt?",
+      "answer": "máy quét mã vạch",
+      "hint": "Nó đọc bằng cảm biến."
+    },
+    {
+      "code": "riddle_047",
+      "category": "riddle",
+      "difficulty": "easy",
+      "question": "Cái gì có thể 'ngủ' mà không nhắm mắt?",
+      "answer": "máy tính (sleep)",
+      "hint": "Chế độ sleep."
+    },
+    {
+      "code": "riddle_048",
+      "category": "riddle",
+      "difficulty": "medium",
+      "question": "Cái gì có thể 'chết' mà vẫn sống trong truyện?",
+      "answer": "nhân vật",
+      "hint": "Trong sách vẫn còn."
+    },
+    {
+      "code": "riddle_049",
+      "category": "riddle",
+      "difficulty": "easy",
+      "question": "Cái gì có thể lớn lên mà không ăn?",
+      "answer": "bóng bay (bơm hơi)",
+      "hint": "Thổi hơi là lớn."
+    },
+    {
+      "code": "riddle_050",
+      "category": "riddle",
+      "difficulty": "easy",
+      "question": "Cái gì có lưỡi mà không biết nếm?",
+      "answer": "đôi giày",
+      "hint": "Giày có 'lưỡi gà' đó!"
+    }
+  ]
+}

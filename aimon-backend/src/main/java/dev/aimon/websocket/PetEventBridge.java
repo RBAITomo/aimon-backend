@@ -7,8 +7,10 @@ import dev.aimon.dto.pet.PetMessageTypes;
 import dev.aimon.dto.pet.PetStatusDto;
 import dev.aimon.entity.pet.PetProfile;
 import dev.aimon.model.*;
+import dev.aimon.dto.pet.QuestDto;
 import dev.aimon.service.pet.PetLevelConfig;
 import dev.aimon.service.pet.PetProfileService;
+import dev.aimon.service.pet.QuestService;
 import io.quarkus.websockets.next.WebSocketConnection;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
@@ -32,6 +34,9 @@ public class PetEventBridge {
 
     @Inject
     ObjectMapper objectMapper;
+
+    @Inject
+    QuestService questService;
 
     /**
      * Handle badge earned event.
@@ -160,6 +165,12 @@ public class PetEventBridge {
         String stage = profile.getStage() != null ? profile.getStage().name() : "EGG";
         String variant = profile.getVariant() != null ? profile.getVariant().getCode() : null;
 
+        // Include pending quest so status pushes don't wipe quest display
+        QuestDto quest = questService.getPendingQuest(profile.getUserId());
+        String questText = quest != null ? "Đố bạn: " + quest.questionText() : null;
+        String questCategory = quest != null ? quest.category() : null;
+        String questDifficulty = quest != null ? quest.difficulty() : null;
+
         return new PetStatusDto(
             profile.getName(),
             stage,
@@ -172,7 +183,8 @@ public class PetEventBridge {
             profile.getXp(),
             xpForNext,
             profile.getAffinity(),
-            profile.getLoginStreak()
+            profile.getLoginStreak(),
+            questText, questCategory, questDifficulty
         );
     }
 

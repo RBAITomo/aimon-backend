@@ -16,5 +16,8 @@ public record PetStatusDto(
     long xp,
     long xpForNext,
     int affinity,
-    int loginStreak
+    int loginStreak,
+    String pendingQuestText,
+    String pendingQuestCategory,
+    String pendingQuestDifficulty
 ) {}

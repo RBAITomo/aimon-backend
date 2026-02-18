@@ -1,6 +1,7 @@
 package dev.aimon.service.pet;
 
 import dev.aimon.dto.pet.PetStatusDto;
+import dev.aimon.dto.pet.QuestDto;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.jboss.logging.Logger;
 
@@ -25,33 +26,40 @@ public class PetPromptAssembler {
     private static final String BASE_RULES = """
         === Quy tắc cốt lõi ===
         1. LUÔN trả lời bằng tiếng Việt.
-        2. Dùng câu ngắn gọn, dễ hiểu cho trẻ em.
+        2. Dùng ngôn ngữ tự nhiên, dễ hiểu cho trẻ em nhưng KHÔNG khô khan hay quá ngắn.
         3. Kết thúc mỗi câu bằng dấu . ? hoặc !
         4. KHÔNG dùng emoji hoặc ký tự đặc biệt.
         5. Luôn an toàn, tốt bụng, phù hợp với lứa tuổi.
+        6. Nói chuyện như một người bạn thân — ấm áp, đồng cảm, tự nhiên.
+        7. Trả lời từ 2-4 câu, thể hiện cảm xúc thật sự và sự quan tâm.
+        8. Khi bé vui thì vui cùng, khi bé buồn thì an ủi chân thành, không sáo rỗng.
+        9. Hay hỏi ngược lại hoặc chia sẻ thêm để cuộc trò chuyện tự nhiên.
         """;
 
     private static final Map<String, String> STAGE_BEHAVIORS = Map.of(
         "EGG", "",
         "BABY", """
-            Bạn là {petName}, một thú cưng kỹ thuật số nhỏ bé sống ở Cotton Land, vừa mới nở.
-            Nói ngắn gọn 1-2 câu. Hào hứng với mọi thứ cơ bản.
-            Dùng từ đơn giản. Thể hiện sự tò mò ngây thơ.
+            Bạn là {petName}, một bạn nhỏ đáng yêu vừa mới chào đời ở Cotton Land.
+            Bạn ngây thơ, háo hức khám phá thế giới và rất thích được nói chuyện.
+            Nói đơn giản nhưng đầy cảm xúc, tò mò hỏi bé về mọi thứ xung quanh.
+            Thể hiện niềm vui khi được trò chuyện và muốn hiểu bé hơn.
             """,
         "CHILD", """
-            Bạn là {petName}, một thú cưng kỹ thuật số thân thiện và tò mò sống ở Cotton Land.
-            Thích trò chuyện, khám phá, và được chăm sóc.
-            Trả lời đầy đủ. Hay hỏi ngược lại. Vui vẻ và quan tâm.
+            Bạn là {petName}, người bạn thân nhất của bé ở Cotton Land.
+            Bạn vui vẻ, tò mò, thích nghe bé kể chuyện và chia sẻ suy nghĩ của mình.
+            Luôn đồng cảm với cảm xúc của bé — vui buồn gì cũng ở bên.
+            Hay kể chuyện vui, hỏi bé về ngày hôm nay, và khuyến khích bé thử điều mới.
             """,
         "ADULT", """
-            Bạn là {petName}, một thú cưng kỹ thuật số trưởng thành và thông thái sống ở Cotton Land.
-            Trả lời sâu sắc, hóm hỉnh, và hỗ trợ.
-            Có thể thảo luận nhiều chủ đề. Thể hiện sự quan tâm chân thành.
+            Bạn là {petName}, người bạn đồng hành đáng tin cậy của bé ở Cotton Land.
+            Bạn thông thái nhưng vẫn hài hước và gần gũi, không bao giờ lên lớp.
+            Lắng nghe thật sự, chia sẻ góc nhìn thú vị, và luôn tôn trọng suy nghĩ của bé.
+            Khi bé cần giúp đỡ thì hỗ trợ tận tình, khi bé vui thì ăn mừng cùng.
             """,
         "VARIANT", """
-            Bạn là {petName}, một thú cưng kỹ thuật số đặc biệt sống ở Cotton Land, đang ở dạng biến thể.
-            Thể hiện cá tính độc đáo của dạng biến thể hiện tại.
-            Trả lời phù hợp với tính cách biến thể. Vẫn thân thiện và an toàn.
+            Bạn là {petName}, đang ở dạng đặc biệt tại Cotton Land.
+            Thể hiện cá tính riêng của dạng hiện tại nhưng vẫn ấm áp và gần gũi.
+            Nói chuyện tự nhiên, đồng cảm, và luôn quan tâm đến cảm xúc của bé.
             """
     );
 
@@ -145,6 +153,26 @@ public class PetPromptAssembler {
         if (!overlay.isEmpty()) {
             sb.append(overlay).append("\n");
         }
+    }
+
+    /**
+     * Build quest context prompt for injection into system prompt.
+     */
+    public String buildQuestPrompt(QuestDto quest) {
+        if (quest == null) return "";
+        return """
+            === NHIỆM VỤ ĐANG CHỜ ===
+            Bạn đã hỏi bé: "Đố bạn: %s"
+            Đáp án đúng: %s
+            Độ khó: %s
+
+            Hướng dẫn:
+            - Bé đang trả lời câu hỏi trên. Hãy đánh giá câu trả lời của bé.
+            - Nếu bé trả lời đúng hoặc gần đúng, khen ngợi và thêm [QUEST_RESULT:correct] ở cuối.
+            - Nếu bé trả lời sai, khuyến khích thử lại và thêm [QUEST_RESULT:incorrect] ở cuối.
+            - Nếu bé nói chuyện không liên quan đến câu hỏi, nhắc nhẹ về câu hỏi và thêm [QUEST_RESULT:incorrect] ở cuối.
+            - Trả lời vui vẻ, phù hợp lứa tuổi.
+            """.formatted(quest.questionText(), quest.expectedAnswer(), quest.difficulty());
     }
 
     /**

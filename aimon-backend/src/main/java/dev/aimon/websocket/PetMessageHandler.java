@@ -8,10 +8,12 @@ import dev.aimon.dto.pet.PetMessageTypes;
 import dev.aimon.dto.pet.PetStatusDto;
 import dev.aimon.entity.pet.PetProfile;
 import dev.aimon.model.PetMood;
+import dev.aimon.dto.pet.QuestDto;
 import dev.aimon.service.pet.BadgeService;
 import dev.aimon.service.pet.PetEvolutionService;
 import dev.aimon.service.pet.PetLevelConfig;
 import dev.aimon.service.pet.PetProfileService;
+import dev.aimon.service.pet.QuestService;
 import io.quarkus.websockets.next.WebSocketConnection;
 import io.quarkus.arc.Arc;
 import io.quarkus.arc.ManagedContext;
@@ -39,6 +41,9 @@ public class PetMessageHandler {
 
     @Inject
     BadgeService badgeService;
+
+    @Inject
+    QuestService questService;
 
     @Inject
     ObjectMapper objectMapper;
@@ -115,17 +120,38 @@ public class PetMessageHandler {
 
     /**
      * Handle quest generation request.
-     * Phase 4 will add LLM integration; for now placeholder.
+     * Assigns a quest from question bank based on pet level.
      */
     public Uni<Void> handleQuestRequest(String robotId, Long userId, WebSocketConnection connection) {
-        LOG.infof("Robot %s: Quest request (LLM integration pending)", robotId);
-
-        ObjectNode response = objectMapper.createObjectNode();
-        response.put("type", PetMessageTypes.QUEST_START);
-        response.put("quest_text", "Quest generation will be available in Phase 4");
-        response.put("difficulty", "easy");
-
-        return sendJson(connection, response);
+        return Uni.createFrom().item(() -> {
+            ManagedContext requestContext = Arc.container().requestContext();
+            boolean activated = !requestContext.isActive();
+            if (activated) { requestContext.activate(); }
+            try {
+                PetProfile profile = petService.getOrCreateProfile(userId);
+                // EGG stage cannot receive quests
+                if ("EGG".equals(profile.getStage().name())) return null;
+                return questService.assignQuest(userId, profile.getLevel());
+            } catch (Exception e) {
+                LOG.errorf(e, "Error assigning quest for robot %s", robotId);
+                return null;
+            } finally {
+                if (activated) { requestContext.terminate(); }
+            }
+        })
+        .runSubscriptionOn(Infrastructure.getDefaultWorkerPool())
+        .onItem().transformToUni(quest -> {
+            if (quest == null) {
+                return sendError(connection, "QUEST_UNAVAILABLE", "No quest available");
+            }
+            ObjectNode response = objectMapper.createObjectNode();
+            response.put("type", PetMessageTypes.QUEST_START);
+            response.put("quest_text", "Đố bạn: " + quest.questionText());
+            response.put("category", quest.category());
+            response.put("difficulty", quest.difficulty());
+            response.put("hint", quest.hint());
+            return sendJson(connection, response);
+        });
     }
 
     /**
@@ -170,6 +196,12 @@ public class PetMessageHandler {
         String stage = profile.getStage() != null ? profile.getStage().name() : "EGG";
         String variant = profile.getVariant() != null ? profile.getVariant().getCode() : null;
 
+        // Include pending quest if exists
+        QuestDto quest = questService.getPendingQuest(profile.getUserId());
+        String questText = quest != null ? "Đố bạn: " + quest.questionText() : null;
+        String questCategory = quest != null ? quest.category() : null;
+        String questDifficulty = quest != null ? quest.difficulty() : null;
+
         return new PetStatusDto(
             profile.getName(),
             stage,
@@ -182,7 +214,8 @@ public class PetMessageHandler {
             profile.getXp(),
             xpForNext,
             profile.getAffinity(),
-            profile.getLoginStreak()
+            profile.getLoginStreak(),
+            questText, questCategory, questDifficulty
         );
     }
 
@@ -204,6 +237,13 @@ public class PetMessageHandler {
         msg.put("xp_for_next", status.xpForNext());
         msg.put("affinity", status.affinity());
         msg.put("login_streak", status.loginStreak());
+        if (status.pendingQuestText() != null) {
+            ObjectNode quest = objectMapper.createObjectNode();
+            quest.put("text", status.pendingQuestText());
+            quest.put("category", status.pendingQuestCategory());
+            quest.put("difficulty", status.pendingQuestDifficulty());
+            msg.set("quest", quest);
+        }
         return msg;
     }
 

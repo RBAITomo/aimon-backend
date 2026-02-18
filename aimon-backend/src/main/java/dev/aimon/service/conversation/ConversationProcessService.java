@@ -7,14 +7,19 @@ import dev.aimon.model.ConversationSession;
 import dev.aimon.service.ai.LiteLlmAIService;
 import dev.aimon.service.memory.ContextRetrievalService;
 import dev.aimon.service.memory.PowerMemService;
+import dev.aimon.dto.pet.QuestDto;
 import dev.aimon.service.pet.PetPromptAssembler;
 import dev.aimon.service.pet.PetProfileService;
+import dev.aimon.service.pet.QuestEvaluationService;
+import dev.aimon.service.pet.QuestService;
+import io.smallrye.mutiny.infrastructure.Infrastructure;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.context.control.ActivateRequestContext;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
 /**
@@ -51,6 +56,12 @@ public class ConversationProcessService {
 
     @Inject
     PetProfileService petProfileService;
+
+    @Inject
+    QuestService questService;
+
+    @Inject
+    QuestEvaluationService questEvaluationService;
 
     @ConfigProperty(name = "memory.mcp.enabled", defaultValue = "true")
     boolean powerMemEnabled;
@@ -118,12 +129,35 @@ public class ConversationProcessService {
                 sentence -> {
                     LOG.debugf("Received sentence from LLM: %s", sentence);
                     fullResponseBuilder.append(sentence).append(" ");
-                    onSentence.accept(sentence);
+                    // Strip quest marker before TTS
+                    String clean = questEvaluationService.stripQuestMarker(sentence);
+                    if (!clean.isEmpty()) {
+                        onSentence.accept(clean);
+                    }
                 },
                 // onComplete: store in session history and notify caller
                 () -> {
                     String fullResponse = fullResponseBuilder.toString().trim();
                     LOG.infof("LLM streaming completed. Response length: %d chars", fullResponse.length());
+
+                    // Process quest result off IO thread (needs JTA transaction)
+                    String questResult = questEvaluationService.parseQuestResult(fullResponse);
+                    if (questResult != null) {
+                        Long uid = Long.parseLong(request.getUserId());
+                        CompletableFuture.runAsync(() -> {
+                            try {
+                                QuestDto quest = questService.getPendingQuest(uid);
+                                if (quest != null) {
+                                    questEvaluationService.processResult(uid, questResult, quest);
+                                }
+                            } catch (Exception e) {
+                                LOG.errorf(e, "Error processing quest result for user %s", uid);
+                            }
+                        }, Infrastructure.getDefaultExecutor());
+                    }
+
+                    // Strip quest marker before storing
+                    fullResponse = questEvaluationService.stripQuestMarker(fullResponse);
 
                     // Store turn in session history (in-memory)
                     session.addTurn(request.getMessage(), fullResponse);
@@ -179,6 +213,14 @@ public class ConversationProcessService {
 
         if (petPrompt != null && !petPrompt.isBlank()) {
             promptBuilder.append(petPrompt).append("\n\n");
+        }
+
+        // 1b. Quest context (if pending quest exists)
+        Long userId = Long.parseLong(request.getUserId());
+        QuestDto pendingQuest = questService.getPendingQuest(userId);
+        if (pendingQuest != null) {
+            String questPrompt = petPromptAssembler.buildQuestPrompt(pendingQuest);
+            promptBuilder.append(questPrompt).append("\n");
         }
 
         // 2. Kid Mode Context
@@ -308,6 +350,14 @@ public class ConversationProcessService {
 
             String enhancedPrompt = buildEnhancedPrompt(request, session, petStatus);
             String response = aiService.generateResponse(request.getMessage(), enhancedPrompt);
+
+            // Process quest result
+            QuestDto quest = questService.getPendingQuest(userId);
+            String questResult = questEvaluationService.parseQuestResult(response);
+            if (questResult != null && quest != null) {
+                questEvaluationService.processResult(userId, questResult, quest);
+            }
+            response = questEvaluationService.stripQuestMarker(response);
 
             // Store in session history
             session.addTurn(request.getMessage(), response);

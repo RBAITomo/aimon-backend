@@ -184,6 +184,15 @@ public class PetProfileService {
     }
 
     /**
+     * Add happiness to pet profile (clamped 0-100).
+     */
+    @Transactional
+    public void addHappiness(Long userId, int amount) {
+        PetProfile profile = getOrCreateProfile(userId);
+        profile.setHappiness(clamp(profile.getHappiness() + amount, 0, 100));
+    }
+
+    /**
      * Apply stat decay (called by scheduler).
      */
     @Transactional
@@ -247,7 +256,8 @@ public class PetProfileService {
             profile.getXp(),
             xpForNext,
             profile.getAffinity(),
-            profile.getLoginStreak()
+            profile.getLoginStreak(),
+            null, null, null
         );
     }
 
