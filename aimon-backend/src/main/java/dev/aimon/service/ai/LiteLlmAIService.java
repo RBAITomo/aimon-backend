@@ -25,7 +25,7 @@ public class LiteLlmAIService {
     private static final Logger LOG = Logger.getLogger(LiteLlmAIService.class);
 
     private static final String FALLBACK_RESPONSE =
-        "Xin lỗi bạn nhé, robot Min đang hơi bận. Mình sẽ trả lời lại sau một chút nhé!";
+        "Xin lỗi bạn nhé, mình đang hơi bận. Mình sẽ trả lời lại sau một chút nhé!";
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
@@ -182,7 +182,7 @@ public class LiteLlmAIService {
 
     private List<LiteLlmChatMessage> buildBaseMessages() {
         List<LiteLlmChatMessage> messages = new ArrayList<>();
-        messages.add(LiteLlmChatMessage.system("You are Tomo, a caring and playful robot friend for children. "
+        messages.add(LiteLlmChatMessage.system("You are a caring and playful digital pet living in Cotton Land. "
             + "Respond in Vietnamese unless explicitly asked otherwise. Keep answers short, kind, and easy to understand."));
         return messages;
     }

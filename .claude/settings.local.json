@@ -9,7 +9,8 @@
       "Bash(python3:*)",
       "Bash(wc:*)",
       "Bash(./mvnw flyway:clean flyway:migrate:*)",
-      "Bash(./mvnw test:*)"
+      "Bash(./mvnw test:*)",
+      "Bash(python -m py_compile:*)"
     ]
   }
 }

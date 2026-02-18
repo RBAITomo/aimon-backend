@@ -1,11 +1,11 @@
 # AI-MON Codebase Summary
 
 **Last Updated:** 2026-02-17
-**Status:** Phase 8 Complete — Camera Vision Direct Refactor
+**Status:** Phase 7 Complete — Game Loop & SFX Integration
 
 ## Overview
 
-AI-MON is a voice-driven AI companion for Raspberry Pi with personality, memory, safety filtering, and on-device camera vision. The refactored `aimon-backend` is a clean, focused Java/Quarkus backend. Phase 8 moved vision analysis from the backend (LiteLLM proxy) to the Pi directly, using google-genai SDK calling Gemini 2.5 Flash.
+AI-MON is a voice-driven AI companion for Raspberry Pi with personality, memory, safety filtering, and on-device camera vision. The refactored `aimon-backend` is a clean, focused Java/Quarkus backend. Phase 7 adds interactive pet game mechanics: SFX feedback (eat, level-up, evolution, badges, quests, warnings), dynamic badges, quest system, pet evolution/regression/transformation sequences, and a 4-layer display compositor supporting per-tick SFX ducking during TTS playback.
 
 **Metrics:**
 - **File Reduction:** 90 → 47 files (48% reduction)
@@ -123,22 +123,27 @@ aimon-frontend/
 ├── main.py                       # Entry point: init HAT, display, state machine
 │
 ├── state/
-│   ├── state_machine.py (300+ LOC)  # Main orchestrator: IDLE→LISTENING→ASR→ANSWER→EMOTION
+│   ├── state_machine.py (443 LOC)   # Main orchestrator: IDLE→LISTENING→ASR→ANSWER→EMOTION, quest/evolution flows
+│   ├── pet-event-handler.py (~157 LOC) # Pet event callbacks, SFX triggers, badge/quest/evolution mgmt (Phase 7)
 │   └── __init__.py
 │
 ├── display/                      # 4-layer compositor UI rendering
-│   ├── display_engine.py (115 LOC)      # Pygame wrapper, LCD output via SPI
+│   ├── display_engine.py (117 LOC)      # Pygame wrapper, LCD output via SPI
 │   ├── layer-compositor.py (155 LOC)    # 4-layer compositor with dirty-region caching
 │   ├── pet-state-model.py (24 LOC)      # PetState dataclass
 │   ├── sprite-sheet-manager.py (150+ LOC) # Frame loader, stage lifecycle
 │   ├── stat-bar-renderer.py (140+ LOC)  # Hunger/energy/happiness/XP bars
 │   ├── speech-bubble-renderer.py (100+ LOC) # Auto-scrolling text overlay
+│   ├── badge-popup-renderer.py (~62 LOC) # Badge notification overlay (Phase 7)
 │   ├── sprite_manager.py (legacy fallback)
 │   └── __init__.py
 │
 ├── audio/
 │   ├── audio_capture.py      # Record OPUS @ 48kHz, push-to-talk
 │   ├── audio_playback.py     # Play PCM16 @ 16kHz, interrupt support
+│   ├── sfx-manager.py        # SFX mixer, channel mgmt, TTS ducking (Phase 7)
+│   ├── sfx/                  # SFX audio files (eat.ogg, level-up.ogg, etc.)
+│   ├── offline/              # Offline TTS fallback audio cache
 │   └── __init__.py
 │
 ├── network/
@@ -160,8 +165,10 @@ aimon-frontend/
 ```
 
 **Key Metrics:**
-- 8 modules + 2 new hardware vision modules, ~1,400 LOC (Python)
+- 10 modules + handlers + vision hardware, ~1,700 LOC (Python)
 - Compositor reduces display updates: 2-3 blits/frame vs. fullscreen redraws
+- SFX: 3 reserved channels (primary, notify, ambient) with TTS ducking
+- Badge/quest/evolution animations driven by WebSocket events
 - Target: 30 FPS on Pi Zero 2
 - Vision: Gemini 2.5 Flash called directly from Pi (no data sent over WS)
 
@@ -172,9 +179,10 @@ aimon-frontend/
 ### WebSocket Handler
 **`AimonWebSocket` (277 LOC)**
 - Endpoint: `ws://localhost:8080/ws/audio/{robotId}`
-- Protocol: v4 (push-to-talk, simplified)
-- States: IDLE → LISTENING → PROCESSING → RESPONDING
+- Protocol: v4 (push-to-talk, simplified) + 9 new pet message types (Phase 7)
+- States: IDLE → LISTENING → PROCESSING → RESPONDING + quest/evolution overlays
 - Handles: hello, audio_start, audio frames, audio_stop, interrupt, ping/pong
+- Pet messages: pet_status, pet_feed_result, badge_earned, pet_evolution, pet_transform, pet_warning, pet_regression, quest_start, camera_result
 
 ### Audio Pipeline
 **`AudioPipelineService`**
@@ -506,6 +514,19 @@ PCM16 Audio Chunks
 3. **WebSocket v4 protocol** (push-to-talk)
 4. **Database migrations** (Flyway, PostgreSQL)
 5. **Integration & testing** (all phases validated)
+
+### Phase 7: Game Loop & SFX Integration ✅
+- **New:** `aimon-frontend/audio/sfx-manager.py` (OGG mixer, 3 channels, TTS ducking)
+- **New:** `aimon-frontend/display/badge-popup-renderer.py` (temporary badge notifications)
+- **New:** `aimon-frontend/state/pet-event-handler.py` (pet message callbacks, SFX/animation triggers)
+- **New directories:** `audio/sfx/`, `audio/offline/` (SFX assets + offline TTS cache)
+- **Modified:** `config.py` (SFX config: channels, ducking volume, badge popup duration)
+- **Modified:** `ws_client.py` (9 new pet message handlers)
+- **Modified:** `state_machine.py` (SFX/badge/quest/evolution/warning animation integration)
+- **Modified:** `display_engine.py` (badge popup renderer param)
+- **Pet messages:** pet_status, pet_feed_result, badge_earned, pet_evolution, pet_transform, pet_transform_end, pet_warning, pet_regression, quest_start
+- **SFX effects:** eat, level-up, evolution, badge, quest, transform, warning, regression
+- **Animation flows:** Quest display, evolution/regression sequences, warning flash, transform overlay
 
 ### Phase 8: Camera Vision Direct Refactor ✅
 - **Moved** vision analysis from backend (LiteLLM proxy) → Pi-direct Gemini API

@@ -217,7 +217,7 @@ public class ConversationProcessService {
             promptBuilder.append("=== Recent Conversation History ===\n");
             for (ConversationSession.ConversationTurn turn : session.getAllTurns()) {
                 promptBuilder.append("User: ").append(turn.getUserMessage()).append("\n");
-                promptBuilder.append("Tomo: ").append(turn.getAiResponse()).append("\n");
+                promptBuilder.append(petStatus.name()).append(": ").append(turn.getAiResponse()).append("\n");
             }
             promptBuilder.append("\n");
         }
@@ -264,7 +264,7 @@ public class ConversationProcessService {
 
             // Record AI response
             memoryService.recordAsync(
-                "Tomo responded: " + response,
+                "Pet responded: " + response,
                 java.util.Map.of(
                     "robot_id", robotId,
                     "session_id", request.getSessionId(),

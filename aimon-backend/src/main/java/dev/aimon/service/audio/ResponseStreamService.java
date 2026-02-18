@@ -214,7 +214,7 @@ public class ResponseStreamService {
         // Pet rewards for completing a conversation turn
         if (session.getUserId() != null) {
             int happinessGain = 3;  // base happiness for chat
-            int xpGain = 2;         // base XP for chat
+            int xpGain = 20;        // 20 XP per turn — egg hatches after 3 messages (3×20=60 > level-2 threshold of 50)
             petProfileService.applyChat(session.getUserId(), happinessGain);
             petProfileService.addXp(session.getUserId(), xpGain);
         }

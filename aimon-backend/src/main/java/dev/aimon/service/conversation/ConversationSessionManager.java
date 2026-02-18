@@ -33,8 +33,8 @@ public class ConversationSessionManager {
      * Fallback system prompt if conscious context loading fails.
      * Taken from LiteLlmAIService default prompt.
      */
-    private static final String FALLBACK_SYSTEM_PROMPT = 
-        "You are Tomo, a caring and playful robot friend for children. "
+    private static final String FALLBACK_SYSTEM_PROMPT =
+        "You are a caring and playful digital pet living in Cotton Land. "
         + "Respond in Vietnamese unless explicitly asked otherwise. "
         + "Keep answers short, kind, and easy to understand.";
 

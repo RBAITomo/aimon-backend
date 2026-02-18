@@ -1,12 +1,12 @@
 # AI-MON System Architecture
 
 **Last Updated:** 2026-02-17
-**Version:** v0.2 (Phase 8: Camera Vision Direct Refactor)
-**Status:** Refactored & Production-Ready
+**Version:** v0.2 (Phase 7: Game Loop & SFX Integration)
+**Status:** Interactive Pet Mechanics Ready
 
 ## System Overview
 
-AI-MON is a distributed voice-driven AI companion system for Raspberry Pi with a clean microservices architecture. The refactored backend (`aimon-backend`) coordinates real-time push-to-talk conversations. The frontend (`aimon-frontend`) implements a 4-layer compositor for efficient pet UI rendering on a 240x280 LCD display and handles camera vision analysis directly on-device via Gemini API (Phase 8).
+AI-MON is a distributed voice-driven AI companion system for Raspberry Pi with a clean microservices architecture. The refactored backend (`aimon-backend`) coordinates real-time push-to-talk conversations and pet game mechanics. The frontend (`aimon-frontend`) implements interactive pet gameplay: SFX feedback, badge notifications, quest system, evolution/regression/transformation sequences, and 4-layer compositor rendering with TTS ducking on a 240x280 LCD display. Phase 7 adds full game loop mechanics; Phase 8 adds camera vision analysis on-device.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -203,20 +203,24 @@ class DisplayEngine:
 
 | Module | Purpose |
 |--------|---------|
-| `state_machine.py` | Main orchestrator: IDLE→LISTENING→ASR→ANSWER→EMOTION→IDLE. Double-press triggers camera flow. |
-| `display_engine.py` | Thin wrapper over LayerCompositor, manages LCD output via SPI (RGB565 format). |
+| `state_machine.py` | Main orchestrator: IDLE→LISTENING→ASR→ANSWER→EMOTION + quest/evolution overlays. Double-press triggers camera. |
+| `state/pet-event-handler.py` | Pet WebSocket callbacks: status, feed, badge, evolution, transform, warning, regression, quest. |
+| `display_engine.py` | Thin wrapper over LayerCompositor, manages LCD output via SPI (RGB565). Badge popup support. |
 | `display/layer-compositor.py` | 4-layer rendering (background, stats, character, speech). Dirty-region caching. |
+| `display/badge-popup-renderer.py` | Temporary badge notification overlay (3-second popup with SFX trigger). |
 | `audio/audio_capture.py` | Record audio in LISTENING state, send OPUS frames to backend. |
 | `audio/audio_playback.py` | Play PCM16 audio chunks from TTS, stop on interrupt. |
-| `network/ws_client.py` | WebSocket v4 client: hello → audio_start/frames/stop → asr/llm/tts/pet_feed events. |
+| `audio/sfx-manager.py` | SFX mixer: 3 channels (primary, notify, ambient), TTS ducking, OGG pre-loading. |
+| `network/ws_client.py` | WebSocket v4 client: hello → audio_start/frames/stop → asr/llm/tts/pet events (21 msg types). |
 | `hardware/camera-capture-service.py` | OV5647 CSI camera capture → raw JPEG bytes (picamera2). Rate-limited (30s). |
 | `hardware/vision-analysis-service.py` | Gemini 2.5 Flash vision: JPEG → `{is_food, food_name, description}` JSON. |
 | `storage/turn_logger.py` | Log conversations for debugging & analytics. |
 
-**Protocol:** WebSocket v4 (push-to-talk)
+**Protocol:** WebSocket v4 (push-to-talk + pet events)
 - Binary OPUS frames (input, 48kHz) / PCM16 chunks (output, 16kHz)
-- JSON control messages
+- JSON control + pet messages (21 message types total)
 - Keepalive (ping/pong)
+- Pet events: pet_status, pet_feed_result, badge_earned, pet_evolution, pet_transform, pet_transform_end, pet_warning, pet_regression, quest_start, camera_result
 
 ---
 
@@ -451,6 +455,61 @@ Server → Client: turn_end {turn_id: "t456", ...}
 
 Ready for new turn or interrupt.
 ```
+
+---
+
+## Game Loop Mechanics (Phase 7)
+
+**Pet State Updates & SFX Feedback**
+
+Frontend receives pet events via WebSocket and updates display in real-time:
+
+```
+[Backend sends pet_status]
+    ↓
+PetEventHandler.on_pet_status()
+    ├─ Update hunger/energy/happiness/level/XP
+    ├─ Mark dirty region for stat bar re-render
+    └─ SfxManager: no SFX (passive update)
+
+[Backend sends pet_feed_result] (on successful feed)
+    ↓
+PetEventHandler.on_pet_feed_result()
+    ├─ SfxManager.play("eat")
+    ├─ Update local hunger stat
+    └─ Display refreshes immediately
+
+[Backend sends badge_earned]
+    ↓
+PetEventHandler.on_badge_earned()
+    ├─ SfxManager.play("badge") on notify channel
+    ├─ BadgePopupRenderer.show(name, description)
+    └─ Popup displays for 90 frames (3s @ 30fps)
+
+[Backend sends pet_evolution]
+    ↓
+PetEventHandler.on_pet_evolution()
+    ├─ SfxManager.play("evolution")
+    ├─ Flag evolution animation pending
+    └─ StateMachine.tick() handles animation sequence
+
+[Backend sends quest_start]
+    ↓
+PetEventHandler.on_quest_start()
+    ├─ SfxManager.play("quest") on notify channel
+    ├─ Store question text
+    └─ Display as speech bubble, child responds via normal voice flow
+```
+
+**SFX Channel Management**
+
+Three dedicated mixer channels with TTS ducking:
+- **Channel 1 (primary):** eat, level-up, evolution, transform (high priority)
+- **Channel 2 (notify):** badge, quest (medium priority, interrupts ambient)
+- **Channel 3 (ambient):** warning, regression (can overlap)
+
+During TTS playback: SfxManager.duck_for_tts() reduces all SFX to 30% volume.
+After TTS ends: SfxManager.unduck() restores 100% volume.
 
 ---
 

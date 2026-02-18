@@ -52,11 +52,11 @@ public class PetLevelConfig {
 
     /**
      * Get stage for a given level.
-     * Levels 1-2: EGG, 3-7: BABY, 8-11: CHILD, 12+: ADULT
+     * Level 1: EGG, 2-6: BABY, 7-11: CHILD, 12+: ADULT
      */
     public static PetStage getStageForLevel(int level) {
-        if (level <= 2) return PetStage.EGG;
-        if (level <= 7) return PetStage.BABY;
+        if (level <= 1) return PetStage.EGG;
+        if (level <= 6) return PetStage.BABY;
         if (level <= 11) return PetStage.CHILD;
         return PetStage.ADULT;
     }
