@@ -61,6 +61,8 @@ public class PetMessageHandler {
             }
             try {
                 PetProfile profile = petService.getOrCreateProfile(userId);
+                LOG.infof("sendPetStatus: user=%d stage=%s level=%d", userId,
+                    profile.getStage() != null ? profile.getStage().name() : "null", profile.getLevel());
                 return buildStatusDto(profile);
             } catch (Exception e) {
                 LOG.errorf(e, "Error sending pet status for user %d", userId);
@@ -84,7 +86,7 @@ public class PetMessageHandler {
      * Handle feed confirmation from client.
      * Pi detects food via Gemini, sends pet_feed_confirm with food_name.
      */
-    public Uni<Void> handleFeedConfirm(String robotId, Long userId, String foodName, WebSocketConnection connection) {
+    public Uni<Void>     handleFeedConfirm(String robotId, Long userId, String foodName, WebSocketConnection connection) {
         int hungerReduction = 25; // Base reduction for camera-fed food
 
         return Uni.createFrom().item(() -> {

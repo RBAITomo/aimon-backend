@@ -69,6 +69,19 @@ public class PetProfileService {
     }
 
     /**
+     * Look up userId by pet name (case-insensitive).
+     * Returns null if no pet with that name exists.
+     */
+    public Long findUserIdByName(String name) {
+        return em.createQuery(
+            "SELECT p.userId FROM PetProfile p WHERE LOWER(p.name) = LOWER(:name)", Long.class)
+            .setParameter("name", name)
+            .getResultStream()
+            .findFirst()
+            .orElse(null);
+    }
+
+    /**
      * Get existing profile (no creation).
      */
     public PetProfile getProfile(Long userId) {

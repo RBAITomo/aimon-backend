@@ -111,6 +111,16 @@ public class PetEventBridge {
     }
 
     /**
+     * Handle quest completion — push updated pet_status (quest cleared).
+     */
+    void onQuestComplete(@Observes PetActionEvent event) {
+        if ("quest_complete".equals(event.actionType())) {
+            LOG.infof("Quest completed for user %d, pushing pet_status update", event.userId());
+            sendPetStatusUpdate(event.userId());
+        }
+    }
+
+    /**
      * Send updated pet status to user's connection.
      */
     private void sendPetStatusUpdate(Long userId) {
@@ -206,6 +216,17 @@ public class PetEventBridge {
         msg.put("xp_for_next", status.xpForNext());
         msg.put("affinity", status.affinity());
         msg.put("login_streak", status.loginStreak());
+
+        // Include quest data so frontend can show/clear quest bubble
+        if (status.pendingQuestText() != null) {
+            ObjectNode quest = objectMapper.createObjectNode();
+            quest.put("text", status.pendingQuestText());
+            quest.put("category", status.pendingQuestCategory());
+            quest.put("difficulty", status.pendingQuestDifficulty());
+            msg.set("quest", quest);
+        }
+        // quest key absent = no pending quest -> frontend clears bubble
+
         return msg;
     }
 }

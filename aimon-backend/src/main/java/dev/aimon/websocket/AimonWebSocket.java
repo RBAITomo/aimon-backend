@@ -26,7 +26,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * WebSocket v4 push-to-talk audio handler.
  * Simplified protocol: hello → audio_start → frames → audio_stop → process → respond → turn_end
  */
-@WebSocket(path = "/ws/audio/{robotId}")
+@WebSocket(path = "/ws/audio/{petId}")
 public class AimonWebSocket {
 
     private static final Logger LOG = Logger.getLogger(AimonWebSocket.class);
@@ -58,15 +58,15 @@ public class AimonWebSocket {
     PetProfileService petProfileService;
 
     @OnOpen
-    public void onOpen(@PathParam String robotId, WebSocketConnection connection) {
-        RobotSession session = new RobotSession(robotId);
-        sessions.put(robotId, session);
-        LOG.infof("Robot %s connected, waiting for hello", robotId);
+    public void onOpen(@PathParam String petId, WebSocketConnection connection) {
+        RobotSession session = new RobotSession(petId);
+        sessions.put(petId, session);
+        LOG.infof("Robot %s connected, waiting for hello", petId);
     }
 
     @OnTextMessage
-    public Uni<Void> onText(String text, @PathParam String robotId, WebSocketConnection connection) {
-        LOG.debugf("Robot %s message: %s", robotId, text);
+    public Uni<Void> onText(String text, @PathParam String petId, WebSocketConnection connection) {
+        LOG.debugf("Robot %s message: %s", petId, text);
 
         return Uni.createFrom().item(() -> {
             try {
@@ -74,34 +74,34 @@ public class AimonWebSocket {
                 String type = message.get("type").asText("");
 
                 return switch (type) {
-                    case "hello" -> handleHello(robotId, message, connection);
-                    case "audio_start" -> handleAudioStart(robotId, connection);
-                    case "audio_stop" -> handleAudioStop(robotId, connection);
-                    case "interrupt" -> handleInterrupt(robotId, connection);
-                    case "ping" -> handlePing(robotId, connection);
-                    case "pet_feed_confirm" -> handlePetFeedConfirm(robotId, message, connection);
-                    case "quest_request" -> handleQuestRequest(robotId, connection);
-                    case "pet_transform" -> petMessageHandler.handleTransformRequest(robotId, getUserId(robotId), message, connection);
+                    case "hello" -> handleHello(petId, message, connection);
+                    case "audio_start" -> handleAudioStart(petId, connection);
+                    case "audio_stop" -> handleAudioStop(petId, connection);
+                    case "interrupt" -> handleInterrupt(petId, connection);
+                    case "ping" -> handlePing(petId, connection);
+                    case "pet_feed_confirm" -> handlePetFeedConfirm(petId, message, connection);
+                    case "quest_request" -> handleQuestRequest(petId, connection);
+                    case "pet_transform" -> petMessageHandler.handleTransformRequest(petId, getUserId(petId), message, connection);
                     default -> sendError(connection, "UNKNOWN_TYPE", "Unknown message type: " + type);
                 };
             } catch (Exception e) {
-                LOG.errorf(e, "Error parsing message from robot %s", robotId);
+                LOG.errorf(e, "Error parsing message from robot %s", petId);
                 return sendError(connection, "PARSE_ERROR", "Failed to parse message");
             }
         }).flatMap(result -> result);
     }
 
     @OnBinaryMessage
-    public Uni<Void> onBinary(byte[] data, @PathParam String robotId) {
-        RobotSession session = sessions.get(robotId);
+    public Uni<Void> onBinary(byte[] data, @PathParam String petId) {
+        RobotSession session = sessions.get(petId);
         if (session == null) {
-            LOG.warnf("Robot %s: No session for binary frame", robotId);
+            LOG.warnf("Robot %s: No session for binary frame", petId);
             return Uni.createFrom().voidItem();
         }
 
         // Only accept frames in LISTENING state
         if (session.getState() != SessionState.LISTENING) {
-            LOG.debugf("Robot %s: Ignoring binary frame in state %s", robotId, session.getState());
+            LOG.debugf("Robot %s: Ignoring binary frame in state %s", petId, session.getState());
             return Uni.createFrom().voidItem();
         }
 
@@ -111,16 +111,16 @@ public class AimonWebSocket {
         }
 
         LOG.tracef("Robot %s: Buffered %d bytes, total frames: %d",
-                robotId, data.length, session.getAudioFrameBuffer().size());
+                petId, data.length, session.getAudioFrameBuffer().size());
 
         return Uni.createFrom().voidItem();
     }
 
     @OnClose
-    public void onClose(@PathParam String robotId) {
-        LOG.infof("Robot %s disconnected", robotId);
+    public void onClose(@PathParam String petId) {
+        LOG.infof("Robot %s disconnected", petId);
 
-        RobotSession session = sessions.remove(robotId);
+        RobotSession session = sessions.remove(petId);
         if (session != null) {
             // Unregister pet connection
             if (session.getUserId() != null) {
@@ -129,7 +129,7 @@ public class AimonWebSocket {
 
             // Upload conversation history to PowerMem
             if (session.getConversation() != null) {
-                uploadConversationHistory(robotId, session);
+                uploadConversationHistory(petId, session);
 
                 // Cleanup conversation session
                 sessionManager.removeSession(session.getConversation().sessionId());
@@ -138,28 +138,27 @@ public class AimonWebSocket {
     }
 
     @OnError
-    public void onError(Throwable error, @PathParam String robotId) {
-        LOG.errorf(error, "Robot %s WebSocket error", robotId);
+    public void onError(Throwable error, @PathParam String petId) {
+        LOG.errorf(error, "Robot %s WebSocket error", petId);
 
         // Cleanup session on error
-        RobotSession session = sessions.remove(robotId);
+        RobotSession session = sessions.remove(petId);
         if (session != null && session.getConversation() != null) {
-            uploadConversationHistory(robotId, session);
+            uploadConversationHistory(petId, session);
             sessionManager.removeSession(session.getConversation().sessionId());
         }
     }
 
     // ==================== Message Handlers ====================
 
-    private Uni<Void> handleHello(String robotId, JsonNode message, WebSocketConnection connection) {
-        RobotSession session = sessions.get(robotId);
+    private Uni<Void> handleHello(String petId, JsonNode message, WebSocketConnection connection) {
+        RobotSession session = sessions.get(petId);
         if (session == null) {
             return sendError(connection, "NO_SESSION", "Session not found");
         }
 
         // Parse client hello
         int version = message.has("version") ? message.get("version").asInt(4) : 4;
-        String deviceId = message.has("device_id") ? message.get("device_id").asText(robotId) : robotId;
 
         // Parse audio params
         if (message.has("audio_params")) {
@@ -173,33 +172,37 @@ public class AimonWebSocket {
         }
 
         LOG.infof("Hello from robot %s: version=%d, format=%s, rate=%dHz",
-                robotId, version, session.getAudioFormat(), session.getSampleRate());
+                petId, version, session.getAudioFormat(), session.getSampleRate());
 
-        // Initialize conversation session
-        session.setConversation(sessionManager.getOrCreateSession(1, session.getSessionId()));
+        // Resolve userId on worker thread — name lookup hits JPA (blocking)
+        return Uni.createFrom().item(() -> resolvePetId(petId))
+            .runSubscriptionOn(Infrastructure.getDefaultWorkerPool())
+            .onItem().transformToUni(resolvedUserId -> {
+                if (resolvedUserId == null) {
+                    LOG.warnf("Pet not found for petId: %s", petId);
+                    return sendError(connection, "UNKNOWN_PET", "Pet not found: " + petId);
+                }
+                session.setUserId(resolvedUserId);
+                session.setConversation(sessionManager.getOrCreateSession(resolvedUserId.intValue(), session.getSessionId()));
 
-        // Set userId (default to 1 for now, can be extracted from device_id or auth later)
-        session.setUserId(1L);
+                ObjectNode response = objectMapper.createObjectNode();
+                response.put("type", "hello_ack");
+                response.put("session_id", session.getSessionId());
+                response.put("server_version", 4);
 
-        // Reply with hello_ack
-        ObjectNode response = objectMapper.createObjectNode();
-        response.put("type", "hello_ack");
-        response.put("session_id", session.getSessionId());
-        response.put("server_version", 4);
+                connectionRegistry.register(resolvedUserId, connection);
 
-        // Register connection and send initial pet status
-        Long userId = session.getUserId();
-        if (userId != null) {
-            connectionRegistry.register(userId, connection);
-            petMessageHandler.sendPetStatus(userId, connection)
-                .subscribe().with(v -> {}, e -> LOG.errorf(e, "Failed to send pet status"));
-        }
-
-        return connection.sendText(response.toString());
+                // Send hello_ack first, then chain pet_status sequentially
+                // to avoid concurrent sendText race condition on the same connection
+                return connection.sendText(response.toString())
+                    .chain(() -> petMessageHandler.sendPetStatus(resolvedUserId, connection))
+                    .onFailure().invoke(e -> LOG.errorf(e, "Failed to send pet status"))
+                    .onFailure().recoverWithNull();
+            });
     }
 
-    private Uni<Void> handleAudioStart(String robotId, WebSocketConnection connection) {
-        RobotSession session = sessions.get(robotId);
+    private Uni<Void> handleAudioStart(String petId, WebSocketConnection connection) {
+        RobotSession session = sessions.get(petId);
         if (session == null) {
             return sendError(connection, "NO_SESSION", "Session not found");
         }
@@ -211,18 +214,18 @@ public class AimonWebSocket {
         session.setCancelled(false);
         session.setState(SessionState.LISTENING);
 
-        LOG.infof("Robot %s: Started listening", robotId);
+        LOG.infof("Robot %s: Started listening", petId);
         return sendAck(connection, "audio_start");
     }
 
-    private Uni<Void> handleAudioStop(String robotId, WebSocketConnection connection) {
-        RobotSession session = sessions.get(robotId);
+    private Uni<Void> handleAudioStop(String petId, WebSocketConnection connection) {
+        RobotSession session = sessions.get(petId);
         if (session == null) {
             return sendError(connection, "NO_SESSION", "Session not found");
         }
 
         session.setState(SessionState.PROCESSING);
-        LOG.infof("Robot %s: Stopped listening, processing audio", robotId);
+        LOG.infof("Robot %s: Stopped listening, processing audio", petId);
 
         // Offload audio processing to worker thread
         return Uni.createFrom().item(() -> {
@@ -255,13 +258,13 @@ public class AimonWebSocket {
         .replaceWithVoid();
     }
 
-    private Uni<Void> handleInterrupt(String robotId, WebSocketConnection connection) {
-        RobotSession session = sessions.get(robotId);
+    private Uni<Void> handleInterrupt(String petId, WebSocketConnection connection) {
+        RobotSession session = sessions.get(petId);
         if (session == null) {
             return sendError(connection, "NO_SESSION", "Session not found");
         }
 
-        LOG.infof("Robot %s: Interrupt requested", robotId);
+        LOG.infof("Robot %s: Interrupt requested", petId);
 
         // Set cancellation flag
         session.setCancelled(true);
@@ -275,35 +278,47 @@ public class AimonWebSocket {
         return connection.sendText(response.toString());
     }
 
-    private Uni<Void> handlePing(String robotId, WebSocketConnection connection) {
+    private Uni<Void> handlePing(String petId, WebSocketConnection connection) {
         ObjectNode response = objectMapper.createObjectNode();
         response.put("type", "pong");
         response.put("timestamp", Instant.now().toEpochMilli());
         return connection.sendText(response.toString());
     }
 
-    private Uni<Void> handlePetFeedConfirm(String robotId, JsonNode message, WebSocketConnection connection) {
-        Long userId = getUserId(robotId);
+    private Uni<Void> handlePetFeedConfirm(String petId, JsonNode message, WebSocketConnection connection) {
+        Long userId = getUserId(petId);
         if (userId == null) {
             return sendError(connection, "NO_USER", "User ID not found");
         }
         String foodName = message.has("food_name") ? message.get("food_name").asText("unknown") : "unknown";
         if (foodName.length() > 100) foodName = foodName.substring(0, 100);
         foodName = foodName.replaceAll("[\\p{Cntrl}]", "");
-        return petMessageHandler.handleFeedConfirm(robotId, userId, foodName, connection);
+        return petMessageHandler.handleFeedConfirm(petId, userId, foodName, connection);
     }
 
-    private Uni<Void> handleQuestRequest(String robotId, WebSocketConnection connection) {
-        Long userId = getUserId(robotId);
+    private Uni<Void> handleQuestRequest(String petId, WebSocketConnection connection) {
+        Long userId = getUserId(petId);
         if (userId == null) {
             return sendError(connection, "NO_USER", "User ID not found");
         }
-        return petMessageHandler.handleQuestRequest(robotId, userId, connection);
+        return petMessageHandler.handleQuestRequest(petId, userId, connection);
     }
 
-    private Long getUserId(String robotId) {
-        RobotSession session = sessions.get(robotId);
+    private Long getUserId(String petId) {
+        RobotSession session = sessions.get(petId);
         return session != null ? session.getUserId() : null;
+    }
+
+    /**
+     * Resolve userId from petId path param.
+     * Accepts numeric userId directly, or pet name (case-insensitive DB lookup).
+     */
+    private Long resolvePetId(String petId) {
+        try {
+            return Long.parseLong(petId);
+        } catch (NumberFormatException e) {
+            return petProfileService.findUserIdByName(petId);
+        }
     }
 
     // ==================== Helper Methods ====================
@@ -323,12 +338,12 @@ public class AimonWebSocket {
         return connection.sendText(response.toString());
     }
 
-    private void uploadConversationHistory(String robotId, RobotSession session) {
+    private void uploadConversationHistory(String petId, RobotSession session) {
         if (!memoryService.isEnabled() || session.getConversation() == null) {
             return;
         }
 
-        LOG.infof("Uploading conversation history for robot %s", robotId);
+        LOG.infof("Uploading conversation history for robot %s", petId);
 
         // Async upload to PowerMem
         // TODO: Implement conversation turn upload to PowerMem

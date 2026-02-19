@@ -62,8 +62,10 @@ services:
       USE_FAST: "true"
       BACKBONE_DEVICE: "auto"
       CODEC_DEVICE: "auto"
+      CUSTOM_VOICES_PATH: /app/vieneu/assets/custom_voices.json
     volumes:
       - huggingface_cache:/root/.cache/huggingface
+      - custom_voices:/app/vieneu/assets
     deploy:
       resources:
         reservations:
@@ -111,6 +113,8 @@ volumes:
   pgdata:
     driver: local
   huggingface_cache:
+    driver: local
+  custom_voices:
     driver: local
 
 networks:

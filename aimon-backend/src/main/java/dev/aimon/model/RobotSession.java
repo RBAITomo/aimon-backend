@@ -12,7 +12,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class RobotSession {
 
     private final String sessionId;
-    private final String robotId;
+    private final String petId;
     private SessionState state;
     private final Deque<byte[]> audioFrameBuffer;
     private final AtomicBoolean isCancelled;
@@ -23,9 +23,9 @@ public class RobotSession {
     private int sampleRate;
     private String audioFormat;
 
-    public RobotSession(String robotId) {
+    public RobotSession(String petId) {
         this.sessionId = UUID.randomUUID().toString();
-        this.robotId = robotId;
+        this.petId = petId;
         this.state = SessionState.IDLE;
         this.audioFrameBuffer = new ArrayDeque<>(128);
         this.isCancelled = new AtomicBoolean(false);
@@ -41,7 +41,7 @@ public class RobotSession {
 
     // Getters and setters
     public String getSessionId() { return sessionId; }
-    public String getRobotId() { return robotId; }
+    public String getPetId() { return petId; }
     public SessionState getState() { return state; }
     public void setState(SessionState state) { this.state = state; }
     public Deque<byte[]> getAudioFrameBuffer() { return audioFrameBuffer; }
