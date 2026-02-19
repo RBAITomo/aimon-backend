@@ -83,13 +83,6 @@
             <artifactId>quarkus-flyway</artifactId>
         </dependency>
 
-        <!-- Multipart file upload support -->
-        <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-rest-multipart</artifactId>
-            <version>${quarkus.platform.version}</version>
-        </dependency>
-
         <!-- REST Clients -->
         <dependency>
             <groupId>io.quarkus</groupId>

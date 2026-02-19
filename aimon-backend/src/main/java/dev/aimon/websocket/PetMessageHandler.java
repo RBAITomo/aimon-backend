@@ -86,7 +86,7 @@ public class PetMessageHandler {
      * Handle feed confirmation from client.
      * Pi detects food via Gemini, sends pet_feed_confirm with food_name.
      */
-    public Uni<Void>     handleFeedConfirm(String robotId, Long userId, String foodName, WebSocketConnection connection) {
+    public Uni<Void> handleFeedConfirm(String robotId, Long userId, String foodName, String spriteKey, WebSocketConnection connection) {
         int hungerReduction = 25; // Base reduction for camera-fed food
 
         return Uni.createFrom().item(() -> {
@@ -113,6 +113,7 @@ public class PetMessageHandler {
             result.put("type", PetMessageTypes.PET_FEED_RESULT);
             result.put("success", true);
             result.put("food_name", foodName);
+            result.put("sprite_key", spriteKey);
             result.put("hunger_reduction", hungerReduction);
 
             return sendJson(connection, result)

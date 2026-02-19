@@ -127,7 +127,7 @@ public class ConversationProcessService {
                 enhancedPrompt,
                 // onSentence: forward to caller and collect
                 sentence -> {
-                    LOG.debugf("Received sentence from LLM: %s", sentence);
+                    LOG.infof("LLM sentence [%d]: %s", fullResponseBuilder.length(), sentence);
                     fullResponseBuilder.append(sentence).append(" ");
                     // Strip quest marker before TTS
                     String clean = questEvaluationService.stripQuestMarker(sentence);
@@ -138,7 +138,7 @@ public class ConversationProcessService {
                 // onComplete: store in session history and notify caller
                 () -> {
                     String fullResponse = fullResponseBuilder.toString().trim();
-                    LOG.infof("LLM streaming completed. Response length: %d chars", fullResponse.length());
+                    LOG.infof("LLM streaming completed. Response length: %d chars. Full response: %s", fullResponse.length(), fullResponse);
 
                     // Process quest result off IO thread (needs JTA transaction)
                     String questResult = questEvaluationService.parseQuestResult(fullResponse);

@@ -66,6 +66,10 @@ public class ResponseStreamService {
         AtomicReference<CompletableFuture<Void>> ttsChain =
                 new AtomicReference<>(CompletableFuture.completedFuture(null));
 
+        // Track pending sentences for has_more signaling
+        java.util.concurrent.atomic.AtomicInteger pendingSentences =
+                new java.util.concurrent.atomic.AtomicInteger(0);
+
         // Sentence splitter for streaming tokens
         SentenceSplitterService.StreamingSplitter splitter =
                 new SentenceSplitterService.StreamingSplitter(sentence -> {
@@ -78,9 +82,12 @@ public class ResponseStreamService {
                     // Send LLM token stream (text shows immediately)
                     sendLlmStream(connection, sentence, false);
 
+                    // Track pending sentence count for has_more
+                    pendingSentences.incrementAndGet();
+
                     // Chain TTS: sentence N+1 waits for sentence N to finish
                     ttsChain.updateAndGet(prev ->
-                            prev.thenCompose(v -> streamSentenceTts(sentence, connection, session)));
+                            prev.thenCompose(v -> streamSentenceTts(sentence, connection, session, pendingSentences)));
                 });
 
         // Process message with streaming
@@ -122,10 +129,15 @@ public class ResponseStreamService {
      * Stream TTS for a single sentence.
      * Returns a CompletableFuture that completes when TTS audio is fully sent.
      */
-    private CompletableFuture<Void> streamSentenceTts(String sentence, WebSocketConnection connection, RobotSession session) {
+    private CompletableFuture<Void> streamSentenceTts(String sentence, WebSocketConnection connection,
+                                                       RobotSession session,
+                                                       java.util.concurrent.atomic.AtomicInteger pendingSentences) {
         if (sentence == null || sentence.trim().isEmpty()) {
+            pendingSentences.decrementAndGet();
             return CompletableFuture.completedFuture(null);
         }
+
+        LOG.infof("TTS sentence start (pending=%d): %s", pendingSentences.get(), sentence);
 
         // Send tts_start
         sendTtsStart(connection, sentence);
@@ -139,6 +151,10 @@ public class ResponseStreamService {
         // Track completion of this TTS operation
         CompletableFuture<Void> future = new CompletableFuture<>();
 
+        // Track last binary send to ensure all bytes are flushed before completing
+        AtomicReference<CompletableFuture<Void>> lastSend =
+                new AtomicReference<>(CompletableFuture.completedFuture(null));
+
         // Stream PCM16 chunks
         ttsProvider.generateSpeechStreaming(
                 request,
@@ -149,22 +165,32 @@ public class ResponseStreamService {
                         return false; // Stop streaming
                     }
 
-                    // Send PCM16 binary chunk (non-blocking subscribe — may run on event loop)
+                    // Chain binary sends so we know when the last one completes
+                    CompletableFuture<Void> sendFuture = new CompletableFuture<>();
                     connection.sendBinary(Buffer.buffer(pcmChunk))
-                            .subscribe().with(v -> {}, err -> LOG.warnf("sendBinary error: %s", err.getMessage()));
+                            .subscribe().with(
+                                    v -> sendFuture.complete(null),
+                                    err -> {
+                                        LOG.warnf("sendBinary error: %s", err.getMessage());
+                                        sendFuture.complete(null); // Don't block chain on send error
+                                    });
+                    lastSend.set(sendFuture);
                     return true; // Continue streaming
                 },
                 () -> {
-                    // TTS complete
-                    if (!session.isCancelled()) {
-                        sendTtsStop(connection, false);
-                    }
-                    future.complete(null);
+                    // TTS generation complete — wait for last binary send to flush
+                    lastSend.get().whenComplete((v, ex) -> {
+                        int remaining = pendingSentences.decrementAndGet();
+                        if (!session.isCancelled()) {
+                            sendTtsStop(connection, remaining > 0);
+                        }
+                        future.complete(null);
+                    });
                 },
                 error -> {
                     LOG.errorf(error, "TTS error for sentence: %s", sentence);
-                    // Continue without TTS (text-only mode)
-                    sendTtsStop(connection, false);
+                    int remaining = pendingSentences.decrementAndGet();
+                    sendTtsStop(connection, remaining > 0);
                     future.complete(null);
                 }
         );

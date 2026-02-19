@@ -127,14 +127,15 @@ aimon-frontend/
 │   ├── pet-event-handler.py (~157 LOC) # Pet event callbacks, SFX triggers, badge/quest/evolution mgmt (Phase 7)
 │   └── __init__.py
 │
-├── display/                      # 4-layer compositor UI rendering
-│   ├── display_engine.py (117 LOC)      # Pygame wrapper, LCD output via SPI
-│   ├── layer-compositor.py (155 LOC)    # 4-layer compositor with dirty-region caching
+├── display/                      # 4-layer (+food sprites) compositor UI rendering
+│   ├── display_engine.py (117 LOC)      # Pygame wrapper, LCD output via SPI, food sprite rendering
+│   ├── layer-compositor.py (155 LOC)    # 4-layer (+food sprites) compositor with dirty-region caching
 │   ├── pet-state-model.py (24 LOC)      # PetState dataclass
 │   ├── sprite-sheet-manager.py (150+ LOC) # Frame loader, stage lifecycle
 │   ├── stat-bar-renderer.py (140+ LOC)  # Hunger/energy/happiness/XP bars
 │   ├── speech-bubble-renderer.py (100+ LOC) # Auto-scrolling text overlay
 │   ├── badge-popup-renderer.py (~62 LOC) # Badge notification overlay (Phase 7)
+│   ├── food-sprite-manager.py (120+ LOC) # Food sprite animation, FIFO queue, auto-eat (Phase 9)
 │   ├── sprite_manager.py (legacy fallback)
 │   └── __init__.py
 │
@@ -537,6 +538,18 @@ PCM16 Audio Chunks
 - **Feed flow:** Pi double-press → JPEG → Gemini → `pet_feed_confirm{food_name}` → backend applies hunger update
 - **WS frame size:** Restored to 64KB (no base64 photos over WebSocket)
 - **New Pi env vars:** `GEMINI_API_KEY`, `GEMINI_MODEL`
+
+### Phase 9: Enhanced Food Feeding UX ✅
+- **Enhanced:** `aimon-frontend/hardware/vision-analysis-service.py` — Gemini returns `sprite_key` (food sprite filename)
+- **New:** `aimon-frontend/display/food-sprite-manager.py` (food sprite animation, FIFO queue max 3, tween easing, auto-eat)
+- **New:** `aimon-frontend/assets/food/` directory (PNG food sprite assets, 32x32 or 48x48)
+- **Modified:** `aimon-frontend/display/layer-compositor.py` — Layer 5 added for food sprite overlay
+- **Modified:** `aimon-frontend/display/display_engine.py` — Integrates food sprite rendering
+- **Modified:** `aimon-frontend/state/pet-event-handler.py` — on_pet_feed_confirm() integrates FoodSpriteManager
+- **Modified:** Backend `PetMessageHandler` — pet_feed_confirm message now includes sprite_key field
+- **Feed flow:** Pi camera → Gemini (with sprite_key) → backend pet_feed_confirm → frontend FoodSpriteManager → on-screen food animation
+- **UX Features:** Food sprites animate toward pet mouth, auto-eat on hunger rise or timer, max 3 concurrent sprites in queue
+- **Sprite assets:** Kebab-case filenames (apple.png, rice.png, milk-bottle.png) match sprite_key from Gemini
 
 ### Features Kept
 - PowerMem 3-layer memory ✅

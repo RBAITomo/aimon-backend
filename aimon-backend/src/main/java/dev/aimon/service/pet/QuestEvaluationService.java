@@ -66,6 +66,8 @@ public class QuestEvaluationService {
             int attempts = questService.getAttemptCount(userId);
             if (attempts >= MAX_ATTEMPTS) {
                 questService.completeQuest(userId, false);
+                // Fire event so frontend clears quest bubble via pet_status push
+                actionEvent.fire(new PetActionEvent(userId, "quest_complete", 1));
                 LOG.infof("User %d quest %s auto-completed after %d attempts", userId, quest.code(), attempts);
             } else {
                 LOG.infof("User %d answered quest %s incorrectly (attempt %d/%d)", userId, quest.code(), attempts, MAX_ATTEMPTS);

@@ -90,9 +90,9 @@ public class VieNeuTtsService {
       ObjectNode payload = objectMapper.createObjectNode();
       payload.put("text", request.getText());
       payload.put("sample_rate", config.sampleRate());
-      payload.put("voice_id", config.voiceId());     // Ngoc - female, clear voice
-      payload.put("silence_p", config.silenceP());   // 0.2s natural pauses
-      // Removed: temperature, top_k, max_chars - use service defaults for speed
+      payload.put("voice_id", config.voiceId());
+      payload.put("silence_p", config.silenceP());
+      payload.put("pitch_shift", config.pitchShift());
 
       HttpRequest httpRequest = HttpRequest.newBuilder()
           .uri(URI.create(url))
@@ -188,6 +188,7 @@ public class VieNeuTtsService {
     payload.put("sample_rate", config.sampleRate());
     payload.put("voice_id", config.voiceId());
     payload.put("silence_p", config.silenceP());
+    payload.put("pitch_shift", config.pitchShift());
 
     String jsonBody = objectMapper.writeValueAsString(payload);
     LOG.debugf("Calling VieNeu streaming at %s (text: %d chars, body: %d bytes)",

@@ -134,6 +134,10 @@ public interface AIConfig {
         @WithDefault("true")
         boolean streaming();
 
+        @WithName("pitch-shift")
+        @WithDefault("0.0")
+        double pitchShift();
+
         @WithName("rollout-percentage")
         @WithDefault("0")
         int rolloutPercentage();

@@ -118,9 +118,9 @@ AI-MON is a distributed voice-driven AI companion system for Raspberry Pi with a
 
 ## Frontend Architecture (aimon-frontend)
 
-### 4-Layer Display Compositor
+### 4-Layer Display Compositor (+ Food Sprite Overlay)
 
-**Purpose:** Efficient rendering of pet UI on Pi Zero 2's 240x280 LCD (ST7789) at 30 FPS.
+**Purpose:** Efficient rendering of pet UI on Pi Zero 2's 240x280 LCD (ST7789) at 30 FPS, with food sprite animation overlay.
 
 **Architecture:**
 ```
@@ -138,9 +138,15 @@ AI-MON is a distributed voice-driven AI companion system for Raspberry Pi with a
   │   ├─ Supports Coneko-egg-form & Coneko-baby-Form assets
   │   └─ Fallback to code-generated placeholder shapes
   │
-  └─ Layer 4: Speech bubble (per-frame, only when text active)
-      ├─ Auto-scrolling text overlay
-      └─ Fade in/out timing
+  ├─ Layer 4: Speech bubble (per-frame, only when text active)
+  │   ├─ Auto-scrolling text overlay
+  │   └─ Fade in/out timing
+  │
+  └─ Layer 5: Food sprites (per-frame, managed by FoodSpriteManager)
+      ├─ Up to 3 on-screen food sprites (FIFO queue)
+      ├─ Tween animation (easing: ease-in-out)
+      ├─ Auto-eat when collision/timer triggers
+      └─ Sprite key matched to food sprite filenames via Gemini vision
 ```
 
 **Key Components:**
@@ -152,6 +158,7 @@ AI-MON is a distributed voice-driven AI companion system for Raspberry Pi with a
 | `sprite-sheet-manager.py` | Frame-based sprite loader, stage lifecycle | 150+ |
 | `stat-bar-renderer.py` | Hunger/energy/happiness bars + XP/level bar | 140+ |
 | `speech-bubble-renderer.py` | Auto-scrolling text bubble with fade timing | 100+ |
+| `food-sprite-manager.py` | Food sprite animation & management (FIFO queue, tween anim, auto-eat) | 120+ |
 | `hardware/camera-capture-service.py` | OV5647 CSI camera → JPEG bytes (picamera2, no disk I/O) | ~108 |
 | `hardware/vision-analysis-service.py` | JPEG → Gemini 2.5 Flash → food detection JSON (google-genai SDK) | ~104 |
 
@@ -204,10 +211,11 @@ class DisplayEngine:
 | Module | Purpose |
 |--------|---------|
 | `state_machine.py` | Main orchestrator: IDLE→LISTENING→ASR→ANSWER→EMOTION + quest/evolution overlays. Double-press triggers camera. |
-| `state/pet-event-handler.py` | Pet WebSocket callbacks: status, feed, badge, evolution, transform, warning, regression, quest. |
-| `display_engine.py` | Thin wrapper over LayerCompositor, manages LCD output via SPI (RGB565). Badge popup support. |
-| `display/layer-compositor.py` | 4-layer rendering (background, stats, character, speech). Dirty-region caching. |
+| `state/pet-event-handler.py` | Pet WebSocket callbacks: status, feed, badge, evolution, transform, warning, regression, quest. Integrates food sprite manager. |
+| `display_engine.py` | Thin wrapper over LayerCompositor, manages LCD output via SPI (RGB565). Badge popup & food sprite rendering. |
+| `display/layer-compositor.py` | 4-layer (+food sprites) rendering (background, stats, character, speech, food overlay). Dirty-region caching. |
 | `display/badge-popup-renderer.py` | Temporary badge notification overlay (3-second popup with SFX trigger). |
+| `display/food-sprite-manager.py` | Food sprite animation & queue mgmt: FIFO (max 3), tween animation, auto-eat on hunger/timer. Sprite key from Gemini vision. |
 | `audio/audio_capture.py` | Record audio in LISTENING state, send OPUS frames to backend. |
 | `audio/audio_playback.py` | Play PCM16 audio chunks from TTS, stop on interrupt. |
 | `audio/sfx-manager.py` | SFX mixer: 3 channels (primary, notify, ambient), TTS ducking, OGG pre-loading. |
@@ -559,9 +567,50 @@ state_machine._on_pet_feed_result()      ← updates local pet stats display
 {
   "is_food": true,
   "food_name": "<Vietnamese name>",
-  "description": "<brief, child-appropriate>"
+  "description": "<brief, child-appropriate>",
+  "sprite_key": "<matching-food-sprite-filename>"   # Phase 9: Added for UX enhancement
 }
 ```
+
+### Food Sprite Manager (Phase 9 Enhancement)
+
+**VisionAnalysisService Extension:**
+- Gemini now returns `sprite_key` matching food sprite filenames (e.g., "apple", "rice", "milk_bottle")
+- Enables visual food sprite animation overlay on pet display
+
+**FoodSpriteManager Workflow:**
+```
+[Backend sends pet_feed_confirm with sprite_key]
+    ↓
+[Frontend: PetEventHandler.on_pet_feed_confirm()]
+    ├─ Extract sprite_key from message
+    ├─ FoodSpriteManager.queue_food(sprite_key)
+    │   ├─ Add to FIFO queue (max 3 sprites)
+    │   ├─ Schedule tween animation (start position → mouth)
+    │   └─ Set auto-eat timer
+    │
+    ├─ Display renders food sprite with per-frame tween
+    │   ├─ Position updates based on easing curve (ease-in-out)
+    │   └─ Rendered on Layer 5 (above character, below speech bubble)
+    │
+    └─ When hunger is high OR timer expires:
+        ├─ Auto-eat: pet sprite plays eat animation
+        ├─ SfxManager.play("eat")
+        ├─ Hunger reduced
+        └─ Food sprite removed from queue
+```
+
+**Sprite Assets:**
+- Located: `aimon-frontend/assets/food/`
+- Format: PNG (32x32 or 48x48)
+- Filename convention: kebab-case (matches `sprite_key` from Gemini)
+- Examples: `apple.png`, `rice.png`, `milk-bottle.png`
+
+**Display Integration:**
+- Layer 5 (new): Food sprites rendered after character (Layer 3) but before/with speech bubble (Layer 4)
+- Tween animation: 60 frames (~2 seconds @ 30 FPS) from top-center to mouth area
+- Collision detection: Simplified, position-based trigger
+- Auto-eat fallback: If pet hunger rises or 5-second timeout, auto-consume
 
 ---
 

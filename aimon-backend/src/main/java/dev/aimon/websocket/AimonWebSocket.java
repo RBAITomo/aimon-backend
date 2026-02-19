@@ -293,7 +293,10 @@ public class AimonWebSocket {
         String foodName = message.has("food_name") ? message.get("food_name").asText("unknown") : "unknown";
         if (foodName.length() > 100) foodName = foodName.substring(0, 100);
         foodName = foodName.replaceAll("[\\p{Cntrl}]", "");
-        return petMessageHandler.handleFeedConfirm(petId, userId, foodName, connection);
+        String spriteKey = message.has("sprite_key") ? message.get("sprite_key").asText("default") : "default";
+        spriteKey = spriteKey.replaceAll("[^a-zA-Z0-9_ ]", "");
+        if (spriteKey.length() > 50) spriteKey = spriteKey.substring(0, 50);
+        return petMessageHandler.handleFeedConfirm(petId, userId, foodName, spriteKey, connection);
     }
 
     private Uni<Void> handleQuestRequest(String petId, WebSocketConnection connection) {
