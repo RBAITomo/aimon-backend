@@ -92,7 +92,8 @@ public class VieNeuTtsService {
       payload.put("sample_rate", config.sampleRate());
       payload.put("voice_id", config.voiceId());
       payload.put("silence_p", config.silenceP());
-      payload.put("pitch_shift", config.pitchShift());
+      double pitch = request.getPitchShift() != null ? request.getPitchShift() : config.pitchShift();
+      payload.put("pitch_shift", pitch);
 
       HttpRequest httpRequest = HttpRequest.newBuilder()
           .uri(URI.create(url))

@@ -148,6 +148,11 @@ public class ResponseStreamService {
         request.setVoiceCode("vi-VN-HoaiMyNeural"); // Default voice
         request.setSpeedRate(1.0); // Normal speed
 
+        // Lower pitch for adult stage (deeper voice)
+        if (session.getPetStage() == dev.aimon.model.PetStage.ADULT) {
+            request.setPitchShift(5.0);
+        }
+
         // Track completion of this TTS operation
         CompletableFuture<Void> future = new CompletableFuture<>();
 

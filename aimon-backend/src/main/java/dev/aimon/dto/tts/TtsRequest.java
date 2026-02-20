@@ -11,6 +11,8 @@ public class TtsRequest {
 
     private Double speedRate; // Tùy chọn, tốc độ nói
 
+    private Double pitchShift; // Tùy chọn, per-request pitch override
+
     public String getText() {
         return text;
     }
@@ -33,5 +35,13 @@ public class TtsRequest {
 
     public void setSpeedRate(Double speedRate) {
         this.speedRate = speedRate;
+    }
+
+    public Double getPitchShift() {
+        return pitchShift;
+    }
+
+    public void setPitchShift(Double pitchShift) {
+        this.pitchShift = pitchShift;
     }
 }

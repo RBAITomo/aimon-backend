@@ -69,6 +69,12 @@ public class ConversationProcessService {
     @Inject
     WorldLoreService worldLoreService;
 
+    @Inject
+    TopicClassifier topicClassifier;
+
+    @Inject
+    AdaptiveInterestService adaptiveInterestService;
+
     @ConfigProperty(name = "memory.mcp.enabled", defaultValue = "true")
     boolean powerMemEnabled;
 
@@ -125,16 +131,28 @@ public class ConversationProcessService {
                 return;
             }
 
+            // Step 2b: Load interests once per session (cached)
+            if (!session.hasTopInterests()) {
+                Integer robotId = parseRobotId(request);
+                java.util.List<String> interests = adaptiveInterestService.getTopInterests(robotId);
+                session.setCachedTopInterests(interests);
+                LOG.debugf("Loaded top interests for session %s: %s", request.getSessionId(), interests);
+            }
+
             // Step 3: Build enhanced prompt with pet personality + memory context
             String enhancedPrompt = buildEnhancedPrompt(request, session, petStatus);
 
-            // Step 4: Collect full response for history storage
+            // Step 4: Get conversation history as proper multi-turn messages
+            java.util.List<dev.aimon.dto.ai.LiteLlmChatMessage> historyMessages = session.getHistoryMessages();
+
+            // Step 5: Collect full response for history storage
             StringBuilder fullResponseBuilder = new StringBuilder();
 
-            // Step 5: Stream from AI service
+            // Step 6: Stream from AI service with proper multi-turn history
             aiService.generateResponseStreaming(
                 request.getMessage(),
                 enhancedPrompt,
+                historyMessages,
                 // onSentence: forward to caller and collect
                 sentence -> {
                     LOG.infof("LLM sentence [%d]: %s", fullResponseBuilder.length(), sentence);
@@ -228,7 +246,16 @@ public class ConversationProcessService {
             promptBuilder.append(cachedPrompt).append("\n\n");
         }
 
-        // 1b. World Lore context (AMBIENT only)
+        // 1a. Adaptive interests prompt
+        java.util.List<String> topInterests = session.getCachedTopInterests();
+        if (topInterests != null && !topInterests.isEmpty()) {
+            String interestsPrompt = adaptiveInterestService.formatInterestsPrompt(topInterests);
+            if (!interestsPrompt.isBlank()) {
+                promptBuilder.append(interestsPrompt).append("\n");
+            }
+        }
+
+        // 1b. World Lore context (AMBIENT only) — pass interests as Vietnamese labels for tag matching
         Long userId = Long.parseLong(request.getUserId());
         if (petStatus.stage() != null && !"EGG".equalsIgnoreCase(petStatus.stage())) {
             try {
@@ -236,8 +263,14 @@ public class ConversationProcessService {
                 if (petProfile == null) throw new IllegalStateException("No pet profile");
                 String worldCode = petProfile.getActiveWorld() != null
                     ? petProfile.getActiveWorld() : "COTTON_LAND";
+                // Convert topic codes to Vietnamese labels to match seed interest_tags
+                java.util.List<String> loreInterests = (topInterests != null)
+                    ? topInterests.stream()
+                        .map(code -> TopicClassifier.TOPIC_DISPLAY_NAMES.getOrDefault(code, code))
+                        .toList()
+                    : null;
                 java.util.List<WorldLore> lore = worldLoreService.getUnlockedLore(
-                    worldCode, petStatus.level(), null);
+                    worldCode, petStatus.level(), loreInterests);
                 String lorePrompt = worldLoreService.formatLorePrompt(lore);
                 if (!lorePrompt.isBlank()) {
                     promptBuilder.append(lorePrompt).append("\n");
@@ -285,19 +318,8 @@ public class ConversationProcessService {
             promptBuilder.append(consciousPrompt).append("\n\n");
         }
 
-        // 5. Conversation History (short-term context)
-        if (session.getHistorySize() > 0) {
-            promptBuilder.append("=== Recent Conversation History ===\n");
-            for (ConversationSession.ConversationTurn turn : session.getAllTurns()) {
-                promptBuilder.append("User: ").append(turn.getUserMessage()).append("\n");
-                promptBuilder.append(petStatus.name()).append(": ").append(turn.getAiResponse()).append("\n");
-            }
-            promptBuilder.append("\n");
-        }
-
-        // 6. Current Message
-        promptBuilder.append("=== Current Message ===\n");
-        promptBuilder.append(request.getMessage());
+        // 5. Conversation history is now passed as proper multi-turn messages
+        //    (not embedded in prompt text) — see processMessageStreaming()
 
         return promptBuilder.toString();
     }
@@ -320,38 +342,45 @@ public class ConversationProcessService {
      * Fire-and-forget operation to avoid blocking conversation flow.
      */
     private void recordToPowerMemAsync(ConversationMessageRequest request, String response) {
-        try {
-            Integer robotId = parseRobotId(request);
+        // Run off Vert.x event loop — topicClassifier.classify() may call blocking LLM REST
+        java.util.concurrent.CompletableFuture.runAsync(() -> {
+            try {
+                Integer robotId = parseRobotId(request);
 
-            // Record user message
-            memoryService.recordAsync(
-                "User said: " + request.getMessage(),
-                java.util.Map.of(
-                    "robot_id", robotId,
-                    "session_id", request.getSessionId(),
-                    "category", "conversation",
-                    "type", "user_message",
-                    "importance", 0.5
-                )
-            );
+                // Classify topics from user message
+                java.util.List<String> topics = topicClassifier.classify(request.getMessage());
 
-            // Record AI response
-            memoryService.recordAsync(
-                "Pet responded: " + response,
-                java.util.Map.of(
-                    "robot_id", robotId,
-                    "session_id", request.getSessionId(),
-                    "category", "conversation",
-                    "type", "ai_response",
-                    "importance", 0.5
-                )
-            );
+                // Record user message (with topics in metadata)
+                memoryService.recordAsync(
+                    "User said: " + request.getMessage(),
+                    new dev.aimon.service.memory.MemoryMetadataBuilder()
+                        .robotId(String.valueOf(robotId))
+                        .sessionId(request.getSessionId())
+                        .category("conversation")
+                        .type("user_message")
+                        .importance(0.5)
+                        .topics(topics)
+                        .build()
+                );
 
-            LOG.debugf("Queued conversation turn for PowerMem recording (session: %s)",
-                       request.getSessionId());
-        } catch (Exception e) {
-            LOG.warnf(e, "Failed to record conversation to PowerMem: %s", e.getMessage());
-        }
+                // Record AI response
+                memoryService.recordAsync(
+                    "Pet responded: " + response,
+                    new dev.aimon.service.memory.MemoryMetadataBuilder()
+                        .robotId(String.valueOf(robotId))
+                        .sessionId(request.getSessionId())
+                        .category("conversation")
+                        .type("ai_response")
+                        .importance(0.5)
+                        .build()
+                );
+
+                LOG.debugf("Queued conversation turn for PowerMem recording (session: %s)",
+                           request.getSessionId());
+            } catch (Exception e) {
+                LOG.warnf(e, "Failed to record conversation to PowerMem: %s", e.getMessage());
+            }
+        });
     }
 
     /**
@@ -381,6 +410,13 @@ public class ConversationProcessService {
             if ("EGG".equalsIgnoreCase(petStatus.stage())) {
                 LOG.debugf("Pet in EGG stage for user %s, skipping LLM call", request.getUserId());
                 return ConversationMessageResponse.success("", request.getSessionId());
+            }
+
+            // Load interests once per session (cached)
+            if (!session.hasTopInterests()) {
+                Integer robotId = parseRobotId(request);
+                java.util.List<String> interests = adaptiveInterestService.getTopInterests(robotId);
+                session.setCachedTopInterests(interests);
             }
 
             String enhancedPrompt = buildEnhancedPrompt(request, session, petStatus);

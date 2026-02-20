@@ -89,10 +89,30 @@ public class LiteLlmAIService {
         Runnable onComplete,
         Consumer<Throwable> onError
     ) {
+        generateResponseStreaming(message, context, List.of(), onSentence, onComplete, onError);
+    }
+
+    public void generateResponseStreaming(
+        String message,
+        String context,
+        List<LiteLlmChatMessage> historyMessages,
+        Consumer<String> onSentence,
+        Runnable onComplete,
+        Consumer<Throwable> onError
+    ) {
         try {
-            // Build messages with context
-            List<LiteLlmChatMessage> messages = buildBaseMessages();
-            messages.add(LiteLlmChatMessage.user(buildPromptWithContext(message, context)));
+            // Build messages: system + context as system, then history turns, then current user message
+            List<LiteLlmChatMessage> messages = new ArrayList<>();
+            // System prompt with context (personality, memory, lore, etc.)
+            String systemContent = buildBaseMessages().get(0).getContent();
+            if (context != null && !context.isBlank()) {
+                systemContent += "\n\n" + context;
+            }
+            messages.add(LiteLlmChatMessage.system(systemContent));
+            // Conversation history as proper multi-turn messages
+            messages.addAll(historyMessages);
+            // Current user message
+            messages.add(LiteLlmChatMessage.user(message));
 
             // Create request with streaming enabled
             LiteLlmChatRequest request = new LiteLlmChatRequest();

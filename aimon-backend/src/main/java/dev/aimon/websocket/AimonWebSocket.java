@@ -183,6 +183,7 @@ public class AimonWebSocket {
                     return sendError(connection, "UNKNOWN_PET", "Pet not found: " + petId);
                 }
                 session.setUserId(resolvedUserId);
+                session.setPetStage(petProfileService.getOrCreateProfile(resolvedUserId).getStage());
                 session.setConversation(sessionManager.getOrCreateSession(resolvedUserId.intValue(), session.getSessionId()));
 
                 ObjectNode response = objectMapper.createObjectNode();

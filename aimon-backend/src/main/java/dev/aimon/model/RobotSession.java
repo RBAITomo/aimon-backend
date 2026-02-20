@@ -18,6 +18,7 @@ public class RobotSession {
     private final AtomicBoolean isCancelled;
     private ConversationSession conversation;
     private Long userId;
+    private PetStage petStage;
 
     // Audio configuration (negotiated in hello)
     private int sampleRate;
@@ -55,4 +56,6 @@ public class RobotSession {
     public void setAudioFormat(String audioFormat) { this.audioFormat = audioFormat; }
     public Long getUserId() { return userId; }
     public void setUserId(Long userId) { this.userId = userId; }
+    public PetStage getPetStage() { return petStage; }
+    public void setPetStage(PetStage petStage) { this.petStage = petStage; }
 }
