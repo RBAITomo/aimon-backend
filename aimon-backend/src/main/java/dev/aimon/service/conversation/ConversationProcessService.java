@@ -11,6 +11,9 @@ import dev.aimon.dto.pet.QuestDto;
 import dev.aimon.service.pet.PetPromptAssembler;
 import dev.aimon.service.pet.PetProfileService;
 import dev.aimon.service.pet.QuestEvaluationService;
+import dev.aimon.service.world.WorldLoreService;
+import dev.aimon.entity.pet.PetProfile;
+import dev.aimon.entity.world.WorldLore;
 import dev.aimon.service.pet.QuestService;
 import io.smallrye.mutiny.infrastructure.Infrastructure;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -62,6 +65,9 @@ public class ConversationProcessService {
 
     @Inject
     QuestEvaluationService questEvaluationService;
+
+    @Inject
+    WorldLoreService worldLoreService;
 
     @ConfigProperty(name = "memory.mcp.enabled", defaultValue = "true")
     boolean powerMemEnabled;
@@ -222,8 +228,26 @@ public class ConversationProcessService {
             promptBuilder.append(cachedPrompt).append("\n\n");
         }
 
-        // 1b. Quest context (if pending quest exists)
+        // 1b. World Lore context (AMBIENT only)
         Long userId = Long.parseLong(request.getUserId());
+        if (petStatus.stage() != null && !"EGG".equalsIgnoreCase(petStatus.stage())) {
+            try {
+                PetProfile petProfile = petProfileService.getProfile(userId);
+                if (petProfile == null) throw new IllegalStateException("No pet profile");
+                String worldCode = petProfile.getActiveWorld() != null
+                    ? petProfile.getActiveWorld() : "COTTON_LAND";
+                java.util.List<WorldLore> lore = worldLoreService.getUnlockedLore(
+                    worldCode, petStatus.level(), null);
+                String lorePrompt = worldLoreService.formatLorePrompt(lore);
+                if (!lorePrompt.isBlank()) {
+                    promptBuilder.append(lorePrompt).append("\n");
+                }
+            } catch (Exception e) {
+                LOG.warnf("Lore retrieval failed, continuing without: %s", e.getMessage());
+            }
+        }
+
+        // 1c. Quest context (if pending quest exists)
         QuestDto pendingQuest = questService.getPendingQuest(userId);
         if (pendingQuest != null) {
             String questPrompt = petPromptAssembler.buildQuestPrompt(pendingQuest);

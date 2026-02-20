@@ -1,8 +1,8 @@
 # AI-MON System Architecture
 
-**Last Updated:** 2026-02-17
-**Version:** v0.2 (Phase 7: Game Loop & SFX Integration)
-**Status:** Interactive Pet Mechanics Ready
+**Last Updated:** 2026-02-20
+**Version:** v0.2 (Phase 7: Game Loop & SFX Integration + Phase 8: World Lore System)
+**Status:** World Lore System Ready
 
 ## System Overview
 
@@ -390,13 +390,20 @@ Processing:
      - Long-term: vector-searched facts
      - Episodic: relevant observations
   3. AIConfig injects personality traits
-  4. ContextRetrievalService formats prompt:
+  4. WorldLoreService injects world context (new in Phase 8):
+     - Fetches AMBIENT lore entries from world_lore table
+     - Filters by: active world, pet level, shard type
+     - Ranks by interest tag overlap with child preferences
+     - Limits to max-inject entries (default: 3)
+     - Formats into prompt context (Vietnamese)
+  5. ContextRetrievalService formats prompt:
      ```
      System: [personality + safety guidelines]
+     World: [world lore facts]
      Memory: [retrieved context]
      User: "Xin chào"
      ```
-  5. LiteLlmAIService calls LLM (streaming):
+  6. LiteLlmAIService calls LLM (streaming):
      - OpenAI GPT-4o-mini by default
      - Streams tokens in real-time
 ```
@@ -611,6 +618,88 @@ state_machine._on_pet_feed_result()      ← updates local pet stats display
 - Tween animation: 60 frames (~2 seconds @ 30 FPS) from top-center to mouth area
 - Collision detection: Simplified, position-based trigger
 - Auto-eat fallback: If pet hunger rises or 5-second timeout, auto-consume
+
+---
+
+## World Lore System (Phase 8)
+
+**Purpose:** Inject contextual world-building facts into conversations, enabling pet to naturally share lore that creates immersive world experience for children.
+
+### Architecture
+
+**Entity Structure:**
+```
+world_lore table:
+  - world_code: "COTTON_LAND", "DEEP_FOREST", etc. (future worlds)
+  - title: Lore entry name
+  - category: "GEOGRAPHY", "CHARACTER", "HISTORY", "ITEM", etc.
+  - content: Prompt-friendly Vietnamese text
+  - min_level: Pet level required to unlock (default: 3)
+  - interest_tags: String[] — tagged for interest-based ranking
+  - shard_type: "AMBIENT" (active), "SIDE"/"MILESTONE" (Phase 2b)
+  - is_active: Boolean flag for enabling/disabling entries
+
+user_shards table:
+  - Tracks which lore entries child has encountered (Phase 2b planned)
+  - source: "EXPLORATION", "DIRECT", etc.
+  - unlocked_at: Timestamp
+
+pet_profiles table additions:
+  - active_world: Currently active world (default: "COTTON_LAND")
+  - current_location: Pet's location within world (default: "SWEET_DOMINION")
+```
+
+### Services
+
+**WorldLoreService:**
+- `getUnlockedLore(worldCode, petLevel, topInterests)`: Fetches eligible AMBIENT entries
+- `formatLorePrompt(entries)`: Formats lore into Vietnamese conversation text
+- Interest-based ranking: Prioritizes entries matching child's detected interests
+- Graceful fallback: If lore retrieval fails, continues conversation without lore
+
+**Repository:**
+- `WorldLoreRepository.findAmbientUnlocked()`: Queries eligible entries by world, level, shard type
+
+### Configuration
+
+**Property:**
+```properties
+world.lore.max-inject=3    # Max entries injected per turn (configurable)
+```
+
+**Example Lore Injection:**
+```
+=== Thế giới của Mon (điều Mon có thể tự nhiên chia sẻ) ===
+- Xứ Bông Hồng nằm giữa những cánh đồng bông trắng xinh đẹp.
+- Ở đây có rất nhiều thứ ngon lành mà Mon yêu thích.
+- Mỗi mùa, xứ Bông Hồng lại có những lễ hội vui nhộn.
+Hãy nhắc đến những điều này tự nhiên trong cuộc trò chuyện khi phù hợp.
+```
+
+### Injection Point
+
+In `ConversationProcessService.buildEnhancedPrompt()`:
+1. Check pet stage (skip if EGG)
+2. Retrieve active_world from pet_profiles
+3. Call `worldLoreService.getUnlockedLore(worldCode, petLevel, interests)`
+4. Format and insert into system prompt before LLM call
+5. Gracefully continue if retrieval fails (catch-and-log)
+
+### Scalability (Future Phases)
+
+**Phase 2b — User Shard Tracking:**
+- Track which lore entries user has discovered
+- Prevent repetition via user_shards join
+- Enable progression-based storytelling
+
+**Phase 2c — Multi-World Support:**
+- Seamless world switching (e.g., "Cotton Land" → "Deep Forest")
+- Location-based context (current_location field)
+- World-specific NPCs and interactions
+
+**Data Seeding:**
+- `world_lore_cotton_land_seed.sql`: Pre-populated Cotton Land lore (30+ entries)
+- Categories: geography, characters, items, events, history
 
 ---
 

@@ -1,11 +1,11 @@
 # AI-MON Codebase Summary
 
-**Last Updated:** 2026-02-17
-**Status:** Phase 7 Complete — Game Loop & SFX Integration
+**Last Updated:** 2026-02-20
+**Status:** Phase 8 Complete — World Lore System Integration
 
 ## Overview
 
-AI-MON is a voice-driven AI companion for Raspberry Pi with personality, memory, safety filtering, and on-device camera vision. The refactored `aimon-backend` is a clean, focused Java/Quarkus backend. Phase 7 adds interactive pet game mechanics: SFX feedback (eat, level-up, evolution, badges, quests, warnings), dynamic badges, quest system, pet evolution/regression/transformation sequences, and a 4-layer display compositor supporting per-tick SFX ducking during TTS playback.
+AI-MON is a voice-driven AI companion for Raspberry Pi with personality, memory, safety filtering, world lore immersion, and on-device camera vision. The refactored `aimon-backend` is a clean, focused Java/Quarkus backend. Phase 7 adds interactive pet game mechanics: SFX feedback, dynamic badges, quest system, pet evolution/regression/transformation, and 4-layer display compositor. Phase 8 adds world lore system: Cotton Land contextual facts injected into conversations based on pet level and child interests.
 
 **Metrics:**
 - **File Reduction:** 90 → 47 files (48% reduction)
@@ -57,7 +57,9 @@ src/main/java/dev/aimon/
 ├── entity/                # Database entities
 │   ├── Parent
 │   ├── User               # Child profiles
-│   └── BannedKeyword      # Kid Mode safety lists
+│   ├── BannedKeyword      # Kid Mode safety lists
+│   └── world/
+│       └── WorldLore      # World lore entries (Phase 8)
 │
 ├── model/                 # Domain models
 │   ├── RobotSession       # WebSocket session state
@@ -96,7 +98,13 @@ src/main/java/dev/aimon/
 │   │   ├── SentenceSplitterService (218 LOC)    # Chunking
 │   │   └── TtsCircuitBreaker
 │   │
+│   ├── world/             # World lore system (Phase 8)
+│   │   └── WorldLoreService (~75 LOC)     # Fetches & ranks lore, formats prompt
+│   │
 │   └── SentenceSplitterService (218 LOC)   # Sentence-splitting for TTS
+│
+├── repository/            # Data access layer
+│   └── WorldLoreRepository            # Query world_lore table
 │
 └── websocket/             # WebSocket v4 protocol handler
     └── AimonWebSocket (277 LOC)  # Push-to-talk endpoint
@@ -484,9 +492,17 @@ PCM16 Audio Chunks
 | `parents` | Parent profiles | Links robots to guardians |
 | `users` | Child profiles | Links to parents |
 | `banned_keywords` | Safety filtering | Kid Mode content blocks |
+| `world_lore` | World context entries | Phase 8: Cotton Land facts, gated by level/shard |
+| `user_shards` | User lore discovery tracking | Phase 2b planned: track unlocked lore entries |
+| `pet_profiles` | Pet state + world fields | Added: active_world, current_location (Phase 8) |
 | PowerMem tables | 3-layer memory | Managed by memoryService |
 
 **Dropped from backyard:** stories, story_chunks, session_logs, robot_entities, MoE tables, face vectors.
+
+**Phase 8 Additions:**
+- `world_lore`: 30+ Cotton Land entries (geography, characters, items, events)
+- `user_shards`: Ready for future progression-based discovery system
+- `pet_profiles`: Now tracks active world and location for multi-world support
 
 ---
 

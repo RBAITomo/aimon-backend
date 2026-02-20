@@ -1,7 +1,7 @@
 ---
 title: "Conversation Quality Improvement"
 description: "Three-layer enhancement: conversation hooks, world lore system, and adaptive interest tracking to make Mon feel like a real friend"
-status: in-progress
+status: in-progress  # Updated: Phase 2 complete, Phase 3 pending
 priority: P1
 effort: 14h
 branch: main
@@ -25,7 +25,7 @@ Source: [brainstorm-report.md](./brainstorm-report.md)
 | # | Phase | Status | Effort | Link |
 |---|-------|--------|--------|------|
 | 1 | Conversation Hook Engine + User Name Wiring + Session Caching | Complete | 4h | [phase-01](./phase-01-conversation-hook-engine.md) |
-| 2 | World Lore System | Pending | 6h | [phase-02-world-lore-system.md](./phase-02-world-lore-system.md) |
+| 2 | World Lore System | Complete | 6h | [phase-02-world-lore-system.md](./phase-02-world-lore-system.md) |
 | 3 | Adaptive Interest System | Pending | 4h | [phase-03-adaptive-interest-system.md](./phase-03-adaptive-interest-system.md) |
 
 ## Key Dependencies

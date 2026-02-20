@@ -66,6 +66,12 @@ public class PetProfile {
     @Column(name = "regression_warnings")
     private Integer regressionWarnings = 0;
 
+    @Column(name = "active_world", length = 50, nullable = false)
+    private String activeWorld = "COTTON_LAND";
+
+    @Column(name = "current_location", length = 50, nullable = false)
+    private String currentLocation = "SWEET_DOMINION";
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
@@ -143,4 +149,9 @@ public class PetProfile {
 
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+
+    public String getActiveWorld() { return activeWorld; }
+    public void setActiveWorld(String activeWorld) { this.activeWorld = activeWorld; }
+    public String getCurrentLocation() { return currentLocation; }
+    public void setCurrentLocation(String currentLocation) { this.currentLocation = currentLocation; }
 }
