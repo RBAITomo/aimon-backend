@@ -32,6 +32,7 @@ public class ConversationSession {
     private volatile String cachedChildName;
     private volatile int cachedChildAge;
     private volatile String cachedSystemPrompt;
+    private volatile java.util.List<String> cachedTopInterests;
 
     /**
      * Creates a new conversation session with conscious context.
@@ -181,6 +182,10 @@ public class ConversationSession {
     public void setCachedSystemPrompt(String cachedSystemPrompt) { this.cachedSystemPrompt = cachedSystemPrompt; }
 
     public boolean hasSystemPrompt() { return cachedSystemPrompt != null; }
+
+    public java.util.List<String> getCachedTopInterests() { return cachedTopInterests; }
+    public void setCachedTopInterests(java.util.List<String> topics) { this.cachedTopInterests = topics; }
+    public boolean hasTopInterests() { return cachedTopInterests != null; }
 
     /** Invalidate cached system prompt so it rebuilds on next message. */
     public void invalidateCachedPrompt() { this.cachedSystemPrompt = null; }

@@ -1,7 +1,7 @@
 # AI-MON Codebase Summary
 
 **Last Updated:** 2026-02-20
-**Status:** Phase 8 Complete — World Lore System Integration
+**Status:** Phase 3 Complete — Adaptive Interest System Integration
 
 ## Overview
 
@@ -97,6 +97,10 @@ src/main/java/dev/aimon/
 │   │   ├── GoogleTtsStreamingService (215 LOC)  # Fallback
 │   │   ├── SentenceSplitterService (218 LOC)    # Chunking
 │   │   └── TtsCircuitBreaker
+│   │
+│   ├── interest/          # Adaptive interest system (Phase 3)
+│   │   ├── TopicClassifier (~130 LOC)     # Keyword + LLM-based topic classification
+│   │   └── AdaptiveInterestService (~100 LOC) # Derives top interests from timeline
 │   │
 │   ├── world/             # World lore system (Phase 8)
 │   │   └── WorldLoreService (~75 LOC)     # Fetches & ranks lore, formats prompt
@@ -213,10 +217,28 @@ aimon-frontend/
 ### Conversation Processing
 **`ConversationProcessService` (298 LOC)**
 - Orchestrates conversation flow
-- Integrates: PowerMem + LiteLLM + sentence splitting + TTS
+- Integrates: PowerMem + LiteLLM + sentence splitting + TTS + interests
 - Handles personality injection
 - Filters content via Kid Mode
 - Streams responses to client
+- **Phase 3:** Loads & caches top interests per session, injects into prompt, records topics to PowerMem
+
+### Adaptive Interests (Phase 3)
+
+**`TopicClassifier` (~130 LOC)**
+- Classifies Vietnamese messages into 15 topic categories
+- Strategy: Keyword matching (< 1ms) → LLM fallback (~5% of messages)
+- `classify(message)`: Fast keyword match, LLM fallback if no match
+- `classifyKeywordOnly(message)`: Keyword-only, used for timeline re-classification
+- 15 categories: khủng long, vũ trụ, động vật, xe cộ, siêu anh hùng, âm nhạc, nghệ thuật, nấu ăn, thể thao, cổ tích, trường học, gia đình, thiên nhiên, khoa học, sách/truyện
+
+**`AdaptiveInterestService` (~100 LOC)**
+- Derives top N interests from recent PowerMem observations
+- `getTopInterests(robotId)`: Fetches timeline, re-classifies user messages, aggregates topic counts
+- Applies diversity cap (default: 60% max frequency per topic)
+- Returns top 3 topics (configurable) ranked by frequency
+- Cached per session to avoid repeated PowerMem calls
+- Configuration: `interest.observation-lookback=30`, `interest.max-topics=3`, `interest.diversity-cap=0.6`
 
 ### Memory System
 **`PowerMemService` (316 LOC)**
@@ -305,11 +327,13 @@ class PetState:
 | **AudioPipelineService** | OPUS→STT pipeline | ~150 | ✅ Clean |
 | **ResponseStreamService** | LLM→TTS→PCM16 pipeline | ~130 | ✅ Clean |
 | **ConversationProcessService** | Conversation orchestrator | 298 | ✅ Refactored |
+| **TopicClassifier** | Vietnamese topic classification | ~130 | ✅ Phase 3 |
+| **AdaptiveInterestService** | Interest detection & caching | ~100 | ✅ Phase 3 |
 | **PowerMemService** | Memory integration | 316 | ✅ Imported |
 | **TtsProviderService** | TTS failover logic | 240 | ✅ Clean |
 | **VieNeuTtsService** | Vietnamese TTS | 263 | ✅ Imported |
 | **GoogleTtsStreamingService** | Fallback TTS | 215 | ✅ Imported |
-| **LiteLlmAIService** | LLM orchestration | 206 | ✅ Imported |
+| **LiteLlmAIService** | LLM orchestrator | 206 | ✅ Imported |
 | **SentenceSplitterService** | Sentence chunking | 218 | ✅ Imported |
 | **GoogleSttService** | Speech recognition | ~100 | ✅ Clean |
 | **ContextRetrievalService** | Memory retrieval | 247 | ✅ Imported |
@@ -531,6 +555,17 @@ PCM16 Audio Chunks
 3. **WebSocket v4 protocol** (push-to-talk)
 4. **Database migrations** (Flyway, PostgreSQL)
 5. **Integration & testing** (all phases validated)
+
+### Phase 3: Adaptive Interest System ✅
+- **New:** `TopicClassifier.java` — Vietnamese topic classification (keyword matching + LLM fallback)
+- **New:** `AdaptiveInterestService.java` — Derives top interests from PowerMem timeline
+- **Modified:** `MemoryMetadataBuilder.java` — Added `topics()` and `topicSentiment()` builder methods
+- **Modified:** `ConversationSession.java` — Added `cachedTopInterests` volatile field for session-level caching
+- **Modified:** `ConversationProcessService.java` — Interest loading at session start, prompt injection, topic classification in recordToPowerMemAsync
+- **Topic categories:** 15 Vietnamese categories (dinosaurs, space, animals, vehicles, superheroes, music, art, cooking, sports, fairy tales, school, family, nature, science, books)
+- **Configuration:** `interest.observation-lookback=30`, `interest.max-topics=3`, `interest.diversity-cap=0.6`
+- **Classification strategy:** Fast keyword matching (< 1ms) → LLM fallback (~5% of messages)
+- **Prompt injection:** `[SỐ THÍCH CỦA BẠN: topic1, topic2, topic3 — ...]` inserted into system prompt before LLM call
 
 ### Phase 7: Game Loop & SFX Integration ✅
 - **New:** `aimon-frontend/audio/sfx-manager.py` (OGG mixer, 3 channels, TTS ducking)

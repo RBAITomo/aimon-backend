@@ -1,8 +1,8 @@
 # AI-MON System Architecture
 
 **Last Updated:** 2026-02-20
-**Version:** v0.2 (Phase 7: Game Loop & SFX Integration + Phase 8: World Lore System)
-**Status:** World Lore System Ready
+**Version:** v0.2 (Phase 3: Adaptive Interests + Phase 7: Game Loop & SFX + Phase 8: World Lore)
+**Status:** Adaptive Interest System Integration Complete
 
 ## System Overview
 
@@ -385,25 +385,35 @@ Server → Client: asr_result {text: "Xin chào", confidence: 0.95}
 ```
 Processing:
   1. ConversationProcessService receives transcript
-  2. PowerMemService retrieves memory context:
+  2. Load child interests (once per session, cached):
+     - AdaptiveInterestService retrieves recent PowerMem timeline
+     - TopicClassifier re-classifies user messages (keyword matching)
+     - Aggregates topic frequencies, applies diversity cap (default: 60%)
+     - Returns top 3 topics (configurable)
+     - Cached in session to avoid repeated PowerMem calls
+  3. PowerMemService retrieves memory context:
      - Short-term: last 5 exchanges
      - Long-term: vector-searched facts
      - Episodic: relevant observations
-  3. AIConfig injects personality traits
-  4. WorldLoreService injects world context (new in Phase 8):
+  4. AIConfig injects personality traits
+  5. Adaptive interests prompt injected (Phase 3):
+     - Formats cached top topics as hint: "[SỞ THÍCH CỦA BẠN: topic1, topic2, topic3 — ...]"
+     - Signals to Mon to mention topics naturally when appropriate
+  6. WorldLoreService injects world context (Phase 8):
      - Fetches AMBIENT lore entries from world_lore table
      - Filters by: active world, pet level, shard type
-     - Ranks by interest tag overlap with child preferences
+     - Ranks by interest tag overlap with child interests
      - Limits to max-inject entries (default: 3)
      - Formats into prompt context (Vietnamese)
-  5. ContextRetrievalService formats prompt:
+  7. ContextRetrievalService formats prompt:
      ```
      System: [personality + safety guidelines]
+     Interests: [child's detected interests hint]
      World: [world lore facts]
      Memory: [retrieved context]
      User: "Xin chào"
      ```
-  6. LiteLlmAIService calls LLM (streaming):
+  8. LiteLlmAIService calls LLM (streaming):
      - OpenAI GPT-4o-mini by default
      - Streams tokens in real-time
 ```
@@ -454,14 +464,19 @@ Server → Client: tts_start {text: "Tôi là AI-MON."}
 ...
 ```
 
-### Step 8: Memory Storage
+### Step 8: Memory Storage & Topic Classification
 ```
 Processing:
-  1. ObservationBuffer collects key facts from response
-  2. PowerMemService stores observations:
-     - Episodic: Timestamped, conversation context
+  1. TopicClassifier analyzes user message (Phase 3):
+     - Keyword matching against 15 Vietnamese topic categories
+     - LLM fallback if no keyword match (~5% of messages)
+     - Returns classified topics
+  2. ObservationBuffer collects key facts from response
+  3. PowerMemService records with topic metadata:
+     - Episodic: Timestamped, conversation context + topics
      - Long-term: Vectorized for future retrieval
-  3. PowerMem MCP service persists to database
+     - Topics stored in metadata for future interest re-classification
+  4. PowerMem MCP service persists to database
 ```
 
 ### Step 9: Conversation Complete
@@ -618,6 +633,67 @@ state_machine._on_pet_feed_result()      ← updates local pet stats display
 - Tween animation: 60 frames (~2 seconds @ 30 FPS) from top-center to mouth area
 - Collision detection: Simplified, position-based trigger
 - Auto-eat fallback: If pet hunger rises or 5-second timeout, auto-consume
+
+---
+
+## Adaptive Interest System (Phase 3)
+
+**Purpose:** Detect and track child's evolving interests from recent conversations, enabling dynamic prompt injection and lore ranking based on observed preferences.
+
+### Architecture
+
+**Topic Categories (15 total):**
+```
+khung-long (Dinosaurs), vu-tru (Space), dong-vat (Animals), xe-co (Vehicles),
+sieu-anh-hung (Superheroes), am-nhac (Music), nghe-thuat (Art), nau-an (Cooking),
+the-thao (Sports), co-tich (Fairy Tales), truong-hoc (School), gia-dinh (Family),
+thien-nhien (Nature), khoa-hoc (Science), sach-truyen (Books/Comics)
+```
+
+**Classification Strategy:**
+1. **KeywordOnly (fast):** Check user message against Vietnamese keyword lists (< 1ms)
+2. **LLM Fallback:** If no keyword match, call LLM for semantic classification (~5% of messages)
+3. **Cached Results:** Topics stored in PowerMem observation metadata for future re-use
+
+**Services:**
+
+**TopicClassifier** (~130 LOC):
+- `classify(message)`: Keyword match → LLM fallback → topic codes
+- `classifyKeywordOnly(message)`: Fast keyword-only (used for bulk re-classification of timeline)
+- `TOPIC_KEYWORDS`: Map<String, List<String>> — Vietnamese keywords per category
+- `TOPIC_DISPLAY_NAMES`: Map<String, String> — Display labels for UI/prompts
+
+**AdaptiveInterestService** (~100 LOC):
+- `getTopInterests(robotId)`: Fetches recent PowerMem timeline, re-classifies content, aggregates topic counts
+- Applies **diversity cap** (default: 60% threshold per topic) to prevent repetition dominance
+- Returns top N topics (default: 3) ranked by frequency
+- Results cached in `ConversationSession.cachedTopInterests` for session lifetime
+
+**Configuration:**
+```properties
+interest.observation-lookback=30        # Days of timeline to consider
+interest.max-topics=3                   # Top N topics to return
+interest.diversity-cap=0.6              # Max 60% for single topic frequency
+```
+
+**Injection Point:**
+
+In `ConversationProcessService.buildEnhancedPrompt()`:
+1. Load interests once per session (cached in `ConversationSession.cachedTopInterests`)
+2. Call `adaptiveInterestService.formatInterestsPrompt(topicCodes)`
+3. Inject into system prompt before LLM call:
+   ```
+   [SỐ THÍCH CỦA BẠN: Khủng long, Vũ trụ, Động vật — đề cập tự nhiên khi phù hợp]
+   ```
+4. Gracefully continue if retrieval fails (catch-and-log)
+
+**Topic Recording (Phase 3):**
+
+In `recordToPowerMemAsync()`:
+- `TopicClassifier.classify()` analyzes user message
+- Topics stored in MemoryMetadataBuilder: `.topics(List<String> topics)`
+- PowerMem observation includes `topics` and optional `topic_sentiment` fields
+- Enables future re-classification without LLM re-processing
 
 ---
 

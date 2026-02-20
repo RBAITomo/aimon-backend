@@ -55,6 +55,18 @@ public class MemoryMetadataBuilder {
         return this;
     }
 
+    public MemoryMetadataBuilder topics(java.util.List<String> topics) {
+        if (topics != null && !topics.isEmpty()) {
+            metadata.put("topics", topics);
+        }
+        return this;
+    }
+
+    public MemoryMetadataBuilder topicSentiment(double sentiment) {
+        metadata.put("topic_sentiment", sentiment);
+        return this;
+    }
+
     public MemoryMetadataBuilder custom(String key, Object value) {
         if (value != null) {
             metadata.put(key, value);

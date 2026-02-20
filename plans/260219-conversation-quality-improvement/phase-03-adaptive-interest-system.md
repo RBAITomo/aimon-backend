@@ -1,6 +1,6 @@
 # Phase 03 — Adaptive Interest System
 
-**Status:** Pending | **Effort:** ~4h | **Priority:** P2
+**Status:** Complete | **Effort:** ~4h | **Priority:** P2
 
 **Context links:**
 - [Brainstorm report](./brainstorm-report.md)
@@ -22,6 +22,14 @@ observations, applies a 60% diversity cap, and returns the top 3 topics.
 
 These inject into `ConversationProcessService.buildEnhancedPrompt()` as a personality hint,
 AND guide `WorldLoreService` to surface lore entries with matching interest tags (Phase 2 hook).
+
+> **⚠ Tag format mismatch (Phase 2↔3):** Phase 2 seed data uses Vietnamese labels as
+> `interest_tags` (e.g. `'động vật'`, `'thiên nhiên'`), while this phase's `TopicClassifier`
+> uses kebab-case codes (e.g. `dong-vat`, `thien-nhien`). Additionally, seed data contains
+> tags not in the 15 categories (e.g. `'cảm xúc'`, `'bạn bè'`, `'bí ẩn'`, `'khám phá'`).
+>
+> **Fix:** Convert topic codes → Vietnamese labels via `TOPIC_DISPLAY_NAMES` before passing
+> to `WorldLoreService.getUnlockedLore()`. Uncovered seed tags won't get ranking — acceptable.
 
 ---
 
@@ -361,7 +369,9 @@ public class AdaptiveInterestService {
     public String formatInterestsPrompt(List<String> topics) {
         if (topics.isEmpty()) return "";
         // Map codes back to Vietnamese labels for LLM readability
-        List<String> labels = topics.stream().map(TopicClassifier.TOPIC_DISPLAY_NAMES::getOrDefault).toList();
+        List<String> labels = topics.stream()
+            .map(code -> TopicClassifier.TOPIC_DISPLAY_NAMES.getOrDefault(code, code))
+            .toList();
         return "[SỞ THÍCH CỦA BẠN: " + String.join(", ", labels) + " — đề cập tự nhiên khi phù hợp]\n";
     }
 }
@@ -466,8 +476,13 @@ if (topInterests != null && !topInterests.isEmpty()) {
     }
 }
 
-// 1b. World Lore — NOW WITH INTEREST RANKING (update Phase 2 lore call to pass interests)
-List<WorldLore> lore = worldLoreService.getUnlockedLore(worldCode, petStatus.level(), topInterests);
+// 1b. World Lore — convert codes → Vietnamese labels to match seed interest_tags
+List<String> loreInterests = (topInterests != null)
+    ? topInterests.stream()
+        .map(code -> TopicClassifier.TOPIC_DISPLAY_NAMES.getOrDefault(code, code))
+        .toList()
+    : null;
+List<WorldLore> lore = worldLoreService.getUnlockedLore(worldCode, petStatus.level(), loreInterests);
 ```
 
 ### Step 7: Add config properties
@@ -499,19 +514,19 @@ cd aimon-backend && mvn compile -q
 
 ## Todo
 
-- [ ] Add `topics()` and `topicSentiment()` to `MemoryMetadataBuilder.java`
-- [ ] Create `TopicClassifier.java` with 15 topic keyword lists + `TOPIC_DISPLAY_NAMES` map
-- [ ] Create `AdaptiveInterestService.java`
-- [ ] Add `cachedTopInterests` field + getters/setters to `ConversationSession.java`
-- [ ] In `ConversationProcessService`: inject `TopicClassifier` + `AdaptiveInterestService`
-- [ ] Update `recordToPowerMemAsync()` to use `MemoryMetadataBuilder` with topics
-- [ ] Add interest loading at session start in `processMessageStreaming()`
-- [ ] Add interest prompt injection in `buildEnhancedPrompt()`
-- [ ] Update Phase 2 lore call to pass `topInterests` for ranking
-- [ ] Verify `TimelineRequest`/`TimelineEntry` DTO field compatibility
-- [ ] Add config to `application.properties`
-- [ ] Run `mvn compile -q` — 0 errors
-- [ ] Manual test: have 3+ conversations about same topic → verify Mon references it
+- [x] Add `topics()` and `topicSentiment()` to `MemoryMetadataBuilder.java`
+- [x] Create `TopicClassifier.java` with 15 topic keyword lists + `TOPIC_DISPLAY_NAMES` map
+- [x] Create `AdaptiveInterestService.java`
+- [x] Add `cachedTopInterests` field + getters/setters to `ConversationSession.java`
+- [x] In `ConversationProcessService`: inject `TopicClassifier` + `AdaptiveInterestService`
+- [x] Update `recordToPowerMemAsync()` to use `MemoryMetadataBuilder` with topics
+- [x] Add interest loading at session start in `processMessageStreaming()`
+- [x] Add interest prompt injection in `buildEnhancedPrompt()`
+- [x] Update Phase 2 lore call to pass `topInterests` for ranking (convert codes → Vietnamese labels first)
+- [x] Verify `TimelineRequest`/`TimelineEntry` DTO field compatibility
+- [x] Add config to `application.properties`
+- [x] Run `mvn compile -q` — 0 errors
+- [x] Manual test: have 3+ conversations about same topic → verify Mon references it
 
 ---
 
