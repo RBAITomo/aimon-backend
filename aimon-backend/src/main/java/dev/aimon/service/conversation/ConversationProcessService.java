@@ -104,9 +104,13 @@ public class ConversationProcessService {
                 request.getSessionId()
             );
 
-            // Step 2: Get pet status and check if EGG stage
+            // Step 2: Get pet status from session cache (loaded at session creation)
             Long userId = Long.parseLong(request.getUserId());
-            PetStatusDto petStatus = petProfileService.getStatus(userId);
+            PetStatusDto petStatus = session.getCachedPetStatus();
+            if (petStatus == null) {
+                petStatus = petProfileService.getStatus(userId);
+                session.setCachedPetStatus(petStatus);
+            }
 
             // EGG stage: skip LLM call, return early
             if ("EGG".equalsIgnoreCase(petStatus.stage())) {
@@ -203,16 +207,19 @@ public class ConversationProcessService {
     ) {
         StringBuilder promptBuilder = new StringBuilder();
 
-        // 1. Pet System Prompt (dynamic based on pet state)
-        // TODO: Extract child name/age from user profile or session if available
-        String petPrompt = petPromptAssembler.buildPetSystemPrompt(
-            petStatus,
-            null,  // childName - can be added to ConversationSession later
-            0      // childAge - can be added to ConversationSession later
-        );
+        // 1. Pet System Prompt — cached per session, rebuilt on invalidation
+        if (!session.hasSystemPrompt()) {
+            String petPrompt = petPromptAssembler.buildPetSystemPrompt(
+                petStatus,
+                session.getCachedChildName(),
+                session.getCachedChildAge()
+            );
+            session.setCachedSystemPrompt(petPrompt);
+        }
 
-        if (petPrompt != null && !petPrompt.isBlank()) {
-            promptBuilder.append(petPrompt).append("\n\n");
+        String cachedPrompt = session.getCachedSystemPrompt();
+        if (cachedPrompt != null && !cachedPrompt.isBlank()) {
+            promptBuilder.append(cachedPrompt).append("\n\n");
         }
 
         // 1b. Quest context (if pending quest exists)
@@ -338,9 +345,13 @@ public class ConversationProcessService {
                 request.getSessionId()
             );
 
-            // Get pet status
+            // Get pet status from session cache
             Long userId = Long.parseLong(request.getUserId());
-            PetStatusDto petStatus = petProfileService.getStatus(userId);
+            PetStatusDto petStatus = session.getCachedPetStatus();
+            if (petStatus == null) {
+                petStatus = petProfileService.getStatus(userId);
+                session.setCachedPetStatus(petStatus);
+            }
 
             // EGG stage: return early with no response
             if ("EGG".equalsIgnoreCase(petStatus.stage())) {

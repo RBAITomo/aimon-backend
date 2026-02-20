@@ -2,6 +2,7 @@ package dev.aimon.service.pet;
 
 import dev.aimon.dto.pet.QuestDto;
 import dev.aimon.model.PetActionEvent;
+import dev.aimon.service.conversation.ConversationSessionManager;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Event;
 import jakarta.inject.Inject;
@@ -29,6 +30,9 @@ public class QuestEvaluationService {
     @Inject
     Event<PetActionEvent> actionEvent;
 
+    @Inject
+    ConversationSessionManager sessionManager;
+
     /**
      * Parse quest result marker from LLM response.
      * @return "correct", "incorrect", or null if no marker
@@ -43,7 +47,7 @@ public class QuestEvaluationService {
      * Strip quest marker from text (for TTS).
      */
     public String stripQuestMarker(String text) {
-        if (text == null) return null;
+        if (text == null) return "";
         return QUEST_MARKER.matcher(text).replaceAll("").trim();
     }
 
@@ -59,6 +63,7 @@ public class QuestEvaluationService {
         if ("correct".equals(result)) {
             applyRewards(userId, quest.difficulty());
             questService.completeQuest(userId, true);
+            sessionManager.invalidateUserCache(userId);
             LOG.infof("User %d answered quest %s correctly", userId, quest.code());
         } else {
             questService.incrementAttempt(userId);
@@ -66,6 +71,7 @@ public class QuestEvaluationService {
             int attempts = questService.getAttemptCount(userId);
             if (attempts >= MAX_ATTEMPTS) {
                 questService.completeQuest(userId, false);
+                sessionManager.invalidateUserCache(userId);
                 // Fire event so frontend clears quest bubble via pet_status push
                 actionEvent.fire(new PetActionEvent(userId, "quest_complete", 1));
                 LOG.infof("User %d quest %s auto-completed after %d attempts", userId, quest.code(), attempts);

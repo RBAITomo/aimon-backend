@@ -9,6 +9,7 @@ import dev.aimon.dto.pet.PetStatusDto;
 import dev.aimon.entity.pet.PetProfile;
 import dev.aimon.model.PetMood;
 import dev.aimon.dto.pet.QuestDto;
+import dev.aimon.service.conversation.ConversationSessionManager;
 import dev.aimon.service.pet.BadgeService;
 import dev.aimon.service.pet.PetEvolutionService;
 import dev.aimon.service.pet.PetLevelConfig;
@@ -44,6 +45,9 @@ public class PetMessageHandler {
 
     @Inject
     QuestService questService;
+
+    @Inject
+    ConversationSessionManager sessionManager;
 
     @Inject
     ObjectMapper objectMapper;
@@ -96,6 +100,7 @@ public class PetMessageHandler {
             try {
                 petService.applyFeed(userId, foodName, hungerReduction);
                 petService.addXp(userId, 10);
+                sessionManager.invalidateUserCache(userId);
                 return true;
             } catch (Exception e) {
                 LOG.errorf(e, "Error applying feed for robot %s", robotId);
@@ -172,7 +177,9 @@ public class PetMessageHandler {
             boolean activated = !requestContext.isActive();
             if (activated) { requestContext.activate(); }
             try {
-                return evolutionService.transformToVariant(userId, variantCode);
+                boolean success = evolutionService.transformToVariant(userId, variantCode);
+                if (success) { sessionManager.invalidateUserCache(userId); }
+                return success;
             } catch (Exception e) {
                 LOG.errorf(e, "Error transforming pet for robot %s", robotId);
                 return false;

@@ -1,9 +1,11 @@
 package dev.aimon.model;
 
 import dev.aimon.dto.ai.LiteLlmChatMessage;
+import dev.aimon.dto.pet.PetStatusDto;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -20,9 +22,16 @@ public class ConversationSession {
     private final Integer userId;
     private final String sessionId;
     private final String consciousSystemPrompt;
-    private Instant lastActivity;
-    private final List<ConversationTurn> history = new ArrayList<>();
+    private volatile Instant lastActivity;
+    private final List<ConversationTurn> history = Collections.synchronizedList(new ArrayList<>());
     private final int maxHistorySize;
+
+    // Cached pet + user profile (loaded once at session creation, invalidated on state changes)
+    // Volatile for cross-thread visibility (written by invalidation, read by IO workers)
+    private volatile PetStatusDto cachedPetStatus;
+    private volatile String cachedChildName;
+    private volatile int cachedChildAge;
+    private volatile String cachedSystemPrompt;
 
     /**
      * Creates a new conversation session with conscious context.
@@ -110,13 +119,12 @@ public class ConversationSession {
      * Implements rolling window (keeps last N turns).
      */
     public void addTurn(String userMessage, String aiResponse) {
-        history.add(new ConversationTurn(userMessage, aiResponse));
-        
-        // Rolling window: keep only recent turns
-        if (history.size() > maxHistorySize) {
-            history.remove(0);
+        synchronized (history) {
+            history.add(new ConversationTurn(userMessage, aiResponse));
+            if (history.size() > maxHistorySize) {
+                history.remove(0);
+            }
         }
-        
         updateLastActivity();
     }
 
@@ -125,19 +133,23 @@ public class ConversationSession {
      * Returns alternating user/assistant messages.
      */
     public List<LiteLlmChatMessage> getHistoryMessages() {
-        List<LiteLlmChatMessage> messages = new ArrayList<>();
-        for (ConversationTurn turn : history) {
-            messages.add(LiteLlmChatMessage.user(turn.userMessage));
-            messages.add(LiteLlmChatMessage.assistant(turn.aiResponse));
+        synchronized (history) {
+            List<LiteLlmChatMessage> messages = new ArrayList<>();
+            for (ConversationTurn turn : history) {
+                messages.add(LiteLlmChatMessage.user(turn.userMessage));
+                messages.add(LiteLlmChatMessage.assistant(turn.aiResponse));
+            }
+            return messages;
         }
-        return messages;
     }
 
     /**
      * Gets all turns for batch upload to PowerMem.
      */
     public List<ConversationTurn> getAllTurns() {
-        return new ArrayList<>(history);
+        synchronized (history) {
+            return new ArrayList<>(history);
+        }
     }
 
     /**
@@ -153,6 +165,25 @@ public class ConversationSession {
     public int getHistorySize() {
         return history.size();
     }
+
+    // --- Cached pet/user profile accessors ---
+
+    public PetStatusDto getCachedPetStatus() { return cachedPetStatus; }
+    public void setCachedPetStatus(PetStatusDto cachedPetStatus) { this.cachedPetStatus = cachedPetStatus; }
+
+    public String getCachedChildName() { return cachedChildName; }
+    public void setCachedChildName(String cachedChildName) { this.cachedChildName = cachedChildName; }
+
+    public int getCachedChildAge() { return cachedChildAge; }
+    public void setCachedChildAge(int cachedChildAge) { this.cachedChildAge = cachedChildAge; }
+
+    public String getCachedSystemPrompt() { return cachedSystemPrompt; }
+    public void setCachedSystemPrompt(String cachedSystemPrompt) { this.cachedSystemPrompt = cachedSystemPrompt; }
+
+    public boolean hasSystemPrompt() { return cachedSystemPrompt != null; }
+
+    /** Invalidate cached system prompt so it rebuilds on next message. */
+    public void invalidateCachedPrompt() { this.cachedSystemPrompt = null; }
 
     @Override
     public String toString() {

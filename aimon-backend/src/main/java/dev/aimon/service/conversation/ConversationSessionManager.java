@@ -1,8 +1,13 @@
 package dev.aimon.service.conversation;
 
+import dev.aimon.dto.pet.PetStatusDto;
+import dev.aimon.entity.User;
 import dev.aimon.model.ConversationSession;
+import dev.aimon.repository.UserRepository;
+import dev.aimon.service.pet.PetProfileService;
 import io.quarkus.scheduler.Scheduled;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
@@ -38,6 +43,12 @@ public class ConversationSessionManager {
         + "Respond in Vietnamese unless explicitly asked otherwise. "
         + "Keep answers short, kind, and easy to understand.";
 
+    @Inject
+    UserRepository userRepository;
+
+    @Inject
+    PetProfileService petProfileService;
+
     private final Map<String, ConversationSession> activeSessions = new ConcurrentHashMap<>();
 
     // Simple counters for monitoring (logging-based metrics)
@@ -65,28 +76,49 @@ public class ConversationSessionManager {
      */
     public ConversationSession getOrCreateSession(Integer userId, String sessionId) {
         ConversationSession existing = activeSessions.get(sessionId);
-        
+
         if (existing != null) {
-            // Cache hit - return existing session
             consciousCacheHits.incrementAndGet();
             existing.updateLastActivity();
             return existing;
         }
-        
-        // Cache miss - create new session
+
+        // Build session outside map lock to avoid blocking other segments
+        ConversationSession newSession = buildNewSession(userId, sessionId);
+        ConversationSession winner = activeSessions.putIfAbsent(sessionId, newSession);
+        if (winner != null) {
+            // Another thread created first — use theirs
+            consciousCacheHits.incrementAndGet();
+            winner.updateLastActivity();
+            return winner;
+        }
+
         consciousCacheMisses.incrementAndGet();
         sessionsCreatedTotal.incrementAndGet();
-        
-        return activeSessions.computeIfAbsent(sessionId, k -> {
-            LOG.infof("Creating new session: %s for userId: %d", sessionId, userId);
-            return new ConversationSession(
-                userId, 
-                sessionId, 
-                FALLBACK_SYSTEM_PROMPT, 
-                Instant.now(),
-                maxHistoryTurns
-            );
-        });
+        return newSession;
+    }
+
+    private ConversationSession buildNewSession(Integer userId, String sessionId) {
+        LOG.infof("Creating new session: %s for userId: %d", sessionId, userId);
+        ConversationSession session = new ConversationSession(
+            userId, sessionId, FALLBACK_SYSTEM_PROMPT, Instant.now(), maxHistoryTurns
+        );
+
+        try {
+            User user = userRepository.findById(userId.longValue());
+            session.setCachedChildName(user != null ? user.getName() : null);
+            session.setCachedChildAge(user != null && user.getAge() != null ? user.getAge() : 0);
+
+            PetStatusDto petStatus = petProfileService.getStatus(userId.longValue());
+            session.setCachedPetStatus(petStatus);
+            LOG.infof("Cached user/pet profile for session %s: name=%s, stage=%s",
+                sessionId, session.getCachedChildName(),
+                petStatus != null ? petStatus.stage() : "null");
+        } catch (Exception e) {
+            LOG.warnf(e, "Failed to pre-load user/pet profile for session %s", sessionId);
+        }
+
+        return session;
     }
 
     /**
@@ -148,6 +180,30 @@ public class ConversationSessionManager {
     }
 
     /**
+     * Invalidate cached system prompt for all sessions belonging to a user.
+     * Called after pet state changes (feed, quest complete, transform, level up).
+     * Also refreshes cached pet status from DB.
+     */
+    public void invalidateUserCache(Long userId) {
+        for (ConversationSession session : activeSessions.values()) {
+            if (session.userId().longValue() == userId) {
+                session.invalidateCachedPrompt();
+                try {
+                    PetStatusDto freshStatus = petProfileService.getStatus(userId);
+                    session.setCachedPetStatus(freshStatus);
+
+                    User user = userRepository.findById(userId);
+                    session.setCachedChildName(user != null ? user.getName() : null);
+                    session.setCachedChildAge(user != null && user.getAge() != null ? user.getAge() : 0);
+                } catch (Exception e) {
+                    LOG.warnf(e, "Failed to refresh cached profile for userId %d", userId);
+                }
+                LOG.debugf("Invalidated cached prompt for userId %d", userId);
+            }
+        }
+    }
+
+    /**
      * Removes a session from active sessions.
      * Typically called when WebSocket connection closes.
      *
@@ -196,7 +252,7 @@ public class ConversationSessionManager {
         long total = cacheHits + cacheMisses;
         double hitRate = total > 0 ? (double) cacheHits / total * 100 : 0;
         
-        LOG.infof("📊 Session Stats: active=%d, created=%d, cache_hit_rate=%.1f%% (%d/%d), uploads(ok=%d,fail=%d), removed=%d",
+        LOG.infof("Session Stats: active=%d, created=%d, cache_hit_rate=%.1f%% (%d/%d), uploads(ok=%d,fail=%d), removed=%d",
                  activeSessions.size(),
                  sessionsCreatedTotal.get(),
                  hitRate,

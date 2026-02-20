@@ -10,7 +10,16 @@
       "Bash(wc:*)",
       "Bash(./mvnw flyway:clean flyway:migrate:*)",
       "Bash(./mvnw test:*)",
-      "Bash(python -m py_compile:*)"
+      "Bash(python -m py_compile:*)",
+      "Bash(git config:*)",
+      "Bash(git submodule:*)",
+      "Bash(docker exec:*)",
+      "Bash(python -c:*)",
+      "Bash(python:*)",
+      "Bash(ls:*)",
+      "Bash(mvn compile:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ]
   }
 }
