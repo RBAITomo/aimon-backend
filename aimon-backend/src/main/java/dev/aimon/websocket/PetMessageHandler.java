@@ -197,6 +197,103 @@ public class PetMessageHandler {
     }
 
     /**
+     * Handle offline_sync message: replay aggregated offline events through existing
+     * PetProfileService methods, respond with authoritative state.
+     */
+    public Uni<Void> handleOfflineSync(String robotId, Long userId, JsonNode message, WebSocketConnection connection) {
+        if (userId == null) {
+            return sendError(connection, "NO_USER", "User ID not found for offline sync");
+        }
+
+        return Uni.createFrom().item(() -> {
+            ManagedContext rc = Arc.container().requestContext();
+            boolean activated = !rc.isActive();
+            if (activated) rc.activate();
+            try {
+                JsonNode events = message.get("events");
+
+                // Aggregate events
+                int decayTicks = 0, totalFeeds = 0;
+                long totalXp = 0;
+                int eventCount = 0;
+                if (events != null && events.isArray()) {
+                    // Cap at 1000 to prevent DoS
+                    eventCount = Math.min(events.size(), 1000);
+                    for (int i = 0; i < eventCount; i++) {
+                        JsonNode event = events.get(i);
+                        String type = event.has("event_type") ? event.get("event_type").asText() : "";
+                        switch (type) {
+                            case "decay_tick" -> decayTicks++;
+                            case "feed" -> totalFeeds++;
+                            case "xp_gain" -> {
+                                JsonNode payload = event.get("payload");
+                                if (payload != null && payload.has("amount"))
+                                    totalXp += payload.get("amount").asLong();
+                            }
+                            default -> {} // level_up, warning, regression — informational only
+                        }
+                    }
+                }
+
+                PetProfile profile = petService.getOrCreateProfile(userId);
+
+                // Apply aggregated decay
+                if (decayTicks > 0) {
+                    petService.applyDecay(profile,
+                        decayTicks,
+                        (int) Math.round(decayTicks * 0.5),
+                        (int) Math.round(decayTicks * 0.3));
+                }
+
+                // Apply feeds
+                for (int i = 0; i < totalFeeds; i++) {
+                    petService.applyFeed(userId, "offline_feed", 15);
+                }
+
+                // Apply XP
+                if (totalXp > 0) {
+                    petService.addXp(userId, (int) totalXp);
+                }
+
+                // Build response with authoritative state
+                PetStatusDto status = buildStatusDto(petService.getOrCreateProfile(userId));
+                ObjectNode response = objectMapper.createObjectNode();
+                response.put("type", "sync_result");
+                response.put("status", "ok");
+                response.put("events_processed", eventCount);
+                response.set("pet_status", objectMapper.valueToTree(status));
+
+                LOG.infof("Offline sync for user %d: %d decay, %d feeds, %d XP (%d events)",
+                    userId, decayTicks, totalFeeds, totalXp, eventCount);
+                return objectMapper.writeValueAsString(response);
+            } catch (Exception e) {
+                LOG.errorf("Offline sync failed for user %d: %s", userId, e.getMessage());
+                sendSyncError(connection, e.getMessage());
+                return null;
+            } finally {
+                if (activated) rc.terminate();
+            }
+        })
+        .runSubscriptionOn(Infrastructure.getDefaultWorkerPool())
+        .onItem().transformToUni(json -> {
+            if (json == null) return Uni.createFrom().voidItem();
+            return connection.sendText(json);
+        });
+    }
+
+    private void sendSyncError(WebSocketConnection connection, String reason) {
+        try {
+            ObjectNode error = objectMapper.createObjectNode();
+            error.put("type", "sync_result");
+            error.put("status", "error");
+            error.put("reason", reason);
+            connection.sendText(objectMapper.writeValueAsString(error)).subscribe().asCompletionStage();
+        } catch (Exception e) {
+            LOG.error("Failed to send sync error", e);
+        }
+    }
+
+    /**
      * Build PetStatusDto from profile entity.
      */
     private PetStatusDto buildStatusDto(PetProfile profile) {

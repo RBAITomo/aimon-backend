@@ -1,8 +1,8 @@
 # AI-MON Project Overview & Product Development Requirements
 
-**Last Updated:** 2026-02-20
-**Status:** v0.2 Production Ready (Phase 9 complete)
-**Project Phase:** 9 of 9 (Enhanced Food Feeding UX) - COMPLETE
+**Last Updated:** 2026-02-22
+**Status:** v0.2+ Production Ready (Phase 10 complete)
+**Project Phase:** 10 of 10 (Offline Resilience & Tamagotchi Sync) - COMPLETE
 
 ---
 
@@ -10,7 +10,7 @@
 
 **AI-MON** (AI-driven Mentor for Children) is a voice-driven AI companion system designed for Raspberry Pi, enabling Vietnamese children to have interactive conversations with an AI personality. The system combines speech recognition, large language models, memory persistence, and safety filtering to create an engaging, educational companion.
 
-**v0.2 Highlights:**
+**v0.2+ Highlights:**
 - Clean, focused microservices architecture
 - Push-to-talk WebSocket v4 protocol
 - 3-layer memory system (PowerMem integration)
@@ -19,6 +19,8 @@
 - 48% code reduction from legacy codebase
 - Camera vision: Pi-direct Gemini API food detection (Phase 8)
 - Enhanced Food Feeding UX: On-screen food sprite animations with tween effects (Phase 9)
+- Offline Resilience: Tamagotchi-style gameplay, SQLite event journal, stat decay engine (Phase 10)
+- Seamless Reconnection: Exponential backoff WebSocket reconnect, event sync via backend (Phase 10)
 
 **Target Users:**
 - Children ages 5-12 (Vietnamese-speaking)
@@ -526,56 +528,79 @@ PowerMem Tables (Managed by memoryservice)
 
 ---
 
+### Phase 10: Offline Resilience & Tamagotchi Sync ✅ COMPLETE
+
+**Purpose:** Enable offline tamagotchi-style gameplay when Pi loses WiFi, with seamless state synchronization on reconnect.
+
+**Offline Gameplay (No Network):**
+- **OfflineGameEngine:** Orchestrator for offline mode (visual-only, text bubbles)
+- **OfflineStatEngine:** Background daemon thread decaying stats every 60s (hunger +1, energy -0.5, happiness -0.3)
+- **OfflineFeedHandler:** Double-press button triggers feed with 30s cooldown (-15 hunger, +3 XP)
+- **OfflineResponseBank:** 75 curated Vietnamese phrases across 5 categories (hungry_high, energy_low, happy_high, neutral, critical) with no-repeat selection logic
+- **OfflineEventJournal:** SQLite event cache (max 1000 events, auto-prune oldest) logging all offline events (decay_tick, feed, interaction, xp_gain, level_up, warning, regression)
+- **StatusDisplay:** Amber LED solid on + "Chế độ ngoại tuyến" label (offline mode indicator)
+
+**Reconnection & Sync:**
+- **WebSocket Reconnect:** Exponential backoff strategy (2s → 4s → 8s → ... → 60s cap)
+- **Event Flush:** All pending offline_events sent to backend in chronological order
+- **Backend SyncHandler:** Aggregates events, applies via PetProfileService, returns authoritative state
+- **Sync Strategy:** Last-write-wins (backend state takes precedence)
+- **XP & Level-Up:** Offline XP accumulates locally (+5 per interaction, +3 per feed); level-up deferred to backend for evolution
+
+**Deliverables:**
+- 6 new Python modules (game engine, stat engine, feed handler, response bank, event journal, supporting files)
+- 75-phrase Vietnamese response bank with no-repeat cycling
+- SQLite schema extension for offline_events table (WAL mode for concurrent access)
+- Amber LED status indicator integration
+- Backend sync handler (Java/Quarkus) for offline event aggregation
+- Exponential backoff reconnection logic (2s → 60s cap)
+- Last-write-wins sync strategy for state consistency
+
+---
+
 ## Success Criteria
 
-### Phase 5 Completion Checklist ✅
+### Phase 10 Completion Checklist ✅
 
-#### Code Quality
-- [x] 47 files total (vs 90 in backyard)
-- [x] 6,302 LOC (vs 11K in backyard)
-- [x] No files exceed 300 LOC (max 277)
-- [x] Clean compilation, no warnings
-- [x] No deprecated code or legacy references
+#### Offline Gameplay
+- [x] OfflineGameEngine orchestrator (start/stop/on_interaction/on_feed)
+- [x] OfflineStatEngine background daemon (60s decay: hunger +1, energy -0.5, happiness -0.3)
+- [x] OfflineFeedHandler (double-press, 30s cooldown, -15 hunger, +3 XP)
+- [x] OfflineResponseBank (75 Vietnamese phrases, 5 categories, no-repeat logic)
+- [x] OfflineEventJournal (SQLite, max 1000 events, auto-prune, WAL mode)
+- [x] Amber LED status indicator for offline mode
+- [x] Visual-only UI (no audio processing offline)
 
-#### Functionality
-- [x] WebSocket v4 protocol fully implemented
-- [x] Push-to-talk audio input working
-- [x] STT integration (Google Cloud)
-- [x] LLM streaming (LiteLLM)
-- [x] TTS output (VieNeu + Google fallback)
-- [x] Memory integration (PowerMem)
-- [x] Kid Mode safety filtering
-- [x] Interrupt support
-- [x] Session persistence
+#### Reconnection & Sync
+- [x] WebSocket exponential backoff (2s → 4s → 8s → 60s cap)
+- [x] Offline event flush on reconnect (all pending events)
+- [x] Backend SyncHandler for event aggregation
+- [x] PetProfileService integration for stat application
+- [x] Last-write-wins sync strategy
+- [x] Authoritative state returned to frontend
 
-#### Architecture
-- [x] 8 packages (clear separation)
-- [x] 6 subpackages in service layer
-- [x] DTOs properly organized (5 sub-packages)
-- [x] Dependency injection setup
-- [x] Health checks implemented
-- [x] Error handling comprehensive
-
-#### Testing
-- [x] Unit tests for critical services
-- [x] Integration tests for pipelines
-- [x] WebSocket handler tests
-- [x] Mock client testing
-- [x] All tests passing
+#### Testing & Validation
+- [x] Unit tests: event journal insert/prune/sync
+- [x] Unit tests: stat decay over multiple ticks
+- [x] Unit tests: feed cooldown enforcement
+- [x] Unit tests: XP accumulation and level-up
+- [x] Unit tests: response bank no-repeat cycling
+- [x] Integration tests: offline → online transition
+- [x] Thread safety: concurrent decay + feed + journal access
 
 #### Documentation
-- [x] System architecture documented
-- [x] Codebase summary complete
-- [x] Code standards established
-- [x] Deployment guide written
-- [x] This PDR document
+- [x] Updated system-architecture.md (Offline Resilience section)
+- [x] Updated project-overview-pdr.md (Phase 10 details)
+- [x] Documented all offline subsystems
+- [x] Data flow diagrams included
+- [x] Configuration constants documented
 
-#### Deployment
-- [x] Docker Compose stack (5 services)
-- [x] Database migrations (Flyway)
-- [x] Environment variables configured
-- [x] Health endpoints working
-- [x] Docker Compose validation
+#### Code Quality (Phase 10 Specific)
+- [x] 6 new Python modules (<100 LOC each)
+- [x] SQLite schema extension (offline_events table)
+- [x] Thread-safe implementation (Lock + check_same_thread=False)
+- [x] No hardcoded values (all in config.py)
+- [x] Clean error handling (graceful fallback on sync failure)
 
 ---
 
@@ -810,6 +835,7 @@ PowerMem Tables (Managed by memoryservice)
 
 | Version | Date | Changes | Author |
 |---------|------|---------|--------|
+| 1.1 | 2026-02-22 | Phase 10 offline resilience feature integration | Docs Manager |
 | 1.0 | 2026-02-15 | Initial document, v0.2 completion | Docs Manager |
 
 ---

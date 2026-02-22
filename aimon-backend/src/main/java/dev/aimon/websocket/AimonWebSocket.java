@@ -82,6 +82,7 @@ public class AimonWebSocket {
                     case "pet_feed_confirm" -> handlePetFeedConfirm(petId, message, connection);
                     case "quest_request" -> handleQuestRequest(petId, connection);
                     case "pet_transform" -> petMessageHandler.handleTransformRequest(petId, getUserId(petId), message, connection);
+                    case "offline_sync" -> petMessageHandler.handleOfflineSync(petId, getUserId(petId), message, connection);
                     default -> sendError(connection, "UNKNOWN_TYPE", "Unknown message type: " + type);
                 };
             } catch (Exception e) {

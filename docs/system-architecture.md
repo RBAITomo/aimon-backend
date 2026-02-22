@@ -1,12 +1,12 @@
 # AI-MON System Architecture
 
-**Last Updated:** 2026-02-20
-**Version:** v0.2 (Phase 3: Adaptive Interests + Phase 7: Game Loop & SFX + Phase 8: World Lore)
-**Status:** Adaptive Interest System Integration Complete
+**Last Updated:** 2026-02-22
+**Version:** v0.2 (Phase 3: Adaptive Interests + Phase 7: Game Loop & SFX + Phase 8: World Lore + Phase 10: Offline Resilience)
+**Status:** Offline Resilience Feature Complete
 
 ## System Overview
 
-AI-MON is a distributed voice-driven AI companion system for Raspberry Pi with a clean microservices architecture. The refactored backend (`aimon-backend`) coordinates real-time push-to-talk conversations and pet game mechanics. The frontend (`aimon-frontend`) implements interactive pet gameplay: SFX feedback, badge notifications, quest system, evolution/regression/transformation sequences, and 4-layer compositor rendering with TTS ducking on a 240x280 LCD display. Phase 7 adds full game loop mechanics; Phase 8 adds camera vision analysis on-device.
+AI-MON is a distributed voice-driven AI companion system for Raspberry Pi with a clean microservices architecture. The refactored backend (`aimon-backend`) coordinates real-time push-to-talk conversations and pet game mechanics. The frontend (`aimon-frontend`) implements interactive pet gameplay: SFX feedback, badge notifications, quest system, evolution/regression/transformation sequences, and 4-layer compositor rendering with TTS ducking on a 240x280 LCD display. Phase 7 adds full game loop mechanics; Phase 8 adds camera vision analysis on-device; Phase 10 adds offline resilience with tamagotchi-style gameplay, local stat decay, and seamless WebSocket reconnection with event synchronization.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -1008,6 +1008,402 @@ GET /health/live               → WebSocket listener
 | **Memory System** | Session logs | PowerMem 3-layer |
 | **Check-in Flow** | Yes | No (simplified) |
 | **Performance** | Complex state machine | Clean, straightforward |
+
+---
+
+## Offline Resilience System (Phase 10)
+
+**Purpose:** Enable tamagotchi-style gameplay when Pi loses WiFi connectivity, with seamless state synchronization upon reconnection.
+
+### Architecture Overview
+
+Offline resilience comprises five integrated subsystems:
+
+```
+[WiFi Loss Detected]
+    ↓
+[OfflineGameEngine starts]
+    ├─ OfflineStatEngine (decay timer, daemon thread)
+    ├─ OfflineFeedHandler (double-press feed + 30s cooldown)
+    ├─ OfflineResponseBank (75 Vietnamese phrases, no-repeat selection)
+    ├─ OfflineEventJournal (SQLite, max 1000 events, auto-prune)
+    └─ StatusDisplay (amber LED, visual-only UI)
+
+[WiFi Restored]
+    ↓
+[WS Reconnect (exponential backoff: 2s→60s cap)]
+    ↓
+[OfflineEventJournal: flush ALL pending events]
+    ↓
+[Backend SyncHandler: aggregate & apply via PetProfileService]
+    ↓
+[Authoritative state returned to frontend]
+```
+
+### 1. Offline Game Engine (Frontend Orchestrator)
+
+**File:** `aimon-frontend/state/offline-game-engine.py`
+
+**Purpose:** Coordinates offline gameplay when WiFi is unavailable.
+
+**Key Features:**
+- Starts on WebSocket disconnect → network error detection
+- Stops on WebSocket reconnection → network restored
+- Non-interactive: visual-only gameplay (no audio, no LLM)
+- Autonomous: stat decay timer runs from background daemon thread
+- Event logging: all gameplay events recorded to SQLite journal
+- Response feedback: Vietnamese text bubbles via response bank
+
+**Public Interface:**
+```python
+class OfflineGameEngine:
+    def start(offline_since_ts: float) -> None
+    def stop() -> dict                          # Returns final state snapshot
+    def on_interaction() -> None                # User taps button (no audio)
+    def on_feed() -> bool                       # Double-press: feed if cooldown OK
+    def get_state_snapshot() -> dict
+```
+
+### 2. Stat Decay Engine (Background Thread)
+
+**File:** `aimon-frontend/state/offline-stat-engine.py`
+
+**Purpose:** Automatically decreases hunger/energy and happiness every 60 seconds.
+
+**Decay Formula (per 60s tick):**
+```
+hunger += 1
+energy -= 0.5
+happiness -= 0.3
+```
+
+**Mechanics:**
+- Thread-safe: acquires `_pet_lock` callback pattern
+- Daemon thread: auto-terminates on main process exit
+- Critical thresholds monitored:
+  - `hunger >= 80`: trigger warning animation
+  - `energy <= 20`: trigger warning animation
+  - `hunger >= 100`: trigger regression animation
+- All decay ticks logged to `OfflineEventJournal`
+
+### 3. Feed Handler (Double-Press Input)
+
+**File:** `aimon-frontend/state/offline-feed-handler.py`
+
+**Purpose:** Enables offline feeding via double-press button (within 500ms).
+
+**Feed Mechanics:**
+- **Cooldown:** 30 seconds between feeds
+- **Hunger reduction:** -15 per feed
+- **XP gain:** +3 per successful feed
+- **Animation:** Eat animation triggered on success
+- **Feedback:** "Ngon quá!" (Delicious!) text bubble
+
+**Cooldown Enforcement:**
+```python
+if time.time() - _last_feed_ts >= 30:
+    apply(-15 hunger, +3 XP)
+    _last_feed_ts = time.time()
+    return True
+return False
+```
+
+### 4. Vietnamese Response Bank (No-Repeat Selection)
+
+**File:** `aimon-frontend/state/offline-response-bank.py` + `aimon-frontend/data/offline-responses.json`
+
+**Purpose:** Display context-aware Vietnamese text feedback during offline gameplay.
+
+**Categories (75 total phrases across 5):**
+- `hungry_high` (hunger >= 70): "Bụng mình đói quá à...", "Cho mình ăn đi...", etc.
+- `energy_low` (energy <= 30): "Mệt quá rồi...", "Mình cần nghỉ ngơi...", etc.
+- `happy_high` (happiness >= 70): "Vui vẻ quá!!", "Cảm ơn bạn nhé!", etc.
+- `neutral` (balanced): "Hôm nay bạn khỏe không?", "Chơi cùng mình nhé!", etc.
+- `critical` (hunger=100 or energy=0): "Giúp mình với!", "Mình không chịu nổi...", etc.
+
+**Selection Logic (No-Repeat):**
+1. Determine dominant condition: `max(hunger, 100-energy, 100-happiness)` → category key
+2. Track used indices per category: `_used_indices[category] = set()`
+3. Pick random unused phrase from category
+4. If all used → reset set, cycle through again
+5. Prevents repetitive feedback in extended offline sessions
+
+### 5. Event Journal (SQLite Local Cache)
+
+**File:** `aimon-frontend/state/offline-event-journal.py`
+
+**Purpose:** Persistently record all offline events for later synchronization.
+
+**Schema:**
+```sql
+CREATE TABLE offline_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_type TEXT NOT NULL,
+    timestamp INTEGER NOT NULL,
+    payload TEXT,                              -- JSON: {hunger, energy, xp, ...}
+    synced INTEGER DEFAULT 0                   -- 0 = pending, 1 = sent to backend
+);
+CREATE INDEX idx_offline_synced ON offline_events(synced, timestamp);
+```
+
+**Event Types:**
+- `decay_tick` — stat decay applied (payload: {hunger, energy, happiness})
+- `feed` — successful feed (payload: {hunger_reduction, xp_gain})
+- `interaction` — button tap (payload: {response_text, xp_gain})
+- `xp_gain` — XP earned (payload: {xp_amount, source})
+- `level_up` — level threshold crossed (payload: {new_level, xp_overflow})
+- `warning` — critical threshold reached (payload: {condition_type})
+- `regression` — hunger hit max (payload: {})
+
+**Storage Limits:**
+- Max 1000 events (auto-prune oldest on insert if >= 1000)
+- Thread-safe: `check_same_thread=False` + `threading.Lock`
+- WAL mode: enabled for concurrent reads/writes
+
+### 6. Status Display (Amber LED + Visual Feedback)
+
+**File:** `aimon-frontend/display/badge-popup-renderer.py` (reused)
+
+**Offline State Indicators:**
+- **Amber LED:** Solid on = offline mode active
+- **UI Label:** "Chế độ ngoại tuyến" (Offline mode) shown in corner
+- **Speech Bubble:** Response text displayed per interaction
+- **Stat Bars:** Update in real-time during offline gameplay
+- **No Audio:** All responses visual-only (text bubbles)
+
+### 7. WebSocket Reconnection (Exponential Backoff)
+
+**File:** `aimon-frontend/network/ws_client.py`
+
+**Purpose:** Automatically reconnect with exponential backoff when WiFi returns.
+
+**Backoff Strategy:**
+```
+Attempt 1: 2 seconds
+Attempt 2: 4 seconds
+Attempt 3: 8 seconds
+...
+Attempt N: 60 seconds (cap)
+```
+
+**Reconnection Flow:**
+```python
+def connect_with_backoff():
+    backoff_ms = 2000
+    while not connected:
+        try:
+            ws = WebSocket.connect(url, timeout=5s)
+            backoff_ms = 2000  # Reset on success
+        except ConnectionError:
+            time.sleep(backoff_ms / 1000)
+            backoff_ms = min(backoff_ms * 2, 60000)  # Cap at 60s
+```
+
+### 8. Backend Sync Handler
+
+**File:** TBD (Java/Quarkus service)
+
+**Purpose:** Aggregates offline events and applies them atomically to backend pet state.
+
+**Sync Protocol:**
+
+1. **Event Flush:** Frontend sends all pending offline_events on reconnect
+2. **Payload Structure:**
+   ```json
+   {
+     "type": "offline_sync",
+     "offline_events": [
+       { "event_type": "decay_tick", "timestamp": 1708600000, "payload": {...} },
+       { "event_type": "feed", "timestamp": 1708600030, "payload": {...} },
+       ...
+     ]
+   }
+   ```
+
+3. **Backend Processing:**
+   - Aggregates events chronologically
+   - Applies all stat deltas via existing `PetProfileService`
+   - Validates final state (hunger/energy 0-100, level >= 1)
+   - Checks for level-up → triggers evolution if applicable
+   - Returns authoritative state to frontend
+
+4. **Sync Strategy:** Last-write-wins
+   - Events processed in timestamp order
+   - Backend state takes precedence if conflicts
+   - Frontend updates local cache to match backend
+
+### 9. Offline-to-Online Transition
+
+**Workflow:**
+
+```
+[Offline Mode Active]
+    • Decay thread running
+    • Events logged to SQLite
+    • Button: interact/feed triggers response bank
+    • Display: text bubbles, stat bars, amber LED
+
+[WiFi Detected]
+    • Stop decay thread
+    • Flush all pending events via `get_all_pending_for_sync()`
+
+[WebSocket Reconnect (with backoff)]
+    • Send hello, restore session
+    • Send offline_sync message with all events
+    • Await authoritative state response
+
+[Backend Processes Offline Sync]
+    • Apply all stat changes via PetProfileService
+    • Update database
+    • Return final pet_status
+
+[Frontend Receives pet_status]
+    • Stop offline game engine
+    • Sync local pet state
+    • Mark all events as synced
+    • Resume normal online mode
+    • Amber LED off
+```
+
+### 10. Data Flow Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ OFFLINE MODE (No WiFi)                                          │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  [Button Events]                                                │
+│      ├─ Single Press → on_interaction()                         │
+│      │    ├─ Determine condition (hunger/energy/happiness)      │
+│      │    ├─ Get response from ResponseBank (no-repeat)         │
+│      │    ├─ Display text bubble                                │
+│      │    ├─ Apply +5 XP                                        │
+│      │    └─ Log interaction event to journal                   │
+│      │                                                           │
+│      └─ Double Press → on_feed()                                │
+│           ├─ Check 30s cooldown                                 │
+│           ├─ Apply -15 hunger, +3 XP                            │
+│           ├─ Trigger eat animation                              │
+│           ├─ Log feed event to journal                          │
+│           └─ Update stat bars                                   │
+│                                                                  │
+│  [Background Thread: OfflineStatEngine]                         │
+│      Every 60 seconds:                                          │
+│      ├─ Apply decay: hunger +1, energy -0.5, happiness -0.3    │
+│      ├─ Clamp to 0-100 range                                    │
+│      ├─ Check critical thresholds                               │
+│      ├─ Log decay_tick event to journal                         │
+│      ├─ Update display                                          │
+│      └─ Trigger animations (warning/regression if needed)       │
+│                                                                  │
+│  [OfflineEventJournal: SQLite Storage]                          │
+│      ├─ Persist all events (decay, feed, interaction, xp)      │
+│      ├─ Auto-prune: keep max 1000 events                        │
+│      ├─ WAL mode: concurrent reads/writes                       │
+│      └─ Thread-safe: Lock + check_same_thread=False             │
+│                                                                  │
+│  [StatusDisplay]                                                │
+│      ├─ Amber LED: solid on                                     │
+│      ├─ UI Label: "Chế độ ngoại tuyến"                          │
+│      └─ No audio output                                         │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+         │
+         │ [WiFi Restored]
+         ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ RECONNECTION PHASE                                              │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  [Exponential Backoff Loop]                                     │
+│      Attempt 1: wait 2s   → try_connect()                       │
+│      Attempt 2: wait 4s   → try_connect()                       │
+│      Attempt 3: wait 8s   → try_connect()                       │
+│      ... (doubling) ...                                         │
+│      Attempt N: wait 60s  → try_connect() [capped]              │
+│                                                                  │
+│  [OfflineEventJournal: Flush]                                   │
+│      ├─ Get ALL pending events (get_all_pending_for_sync)       │
+│      ├─ Build offline_sync WebSocket message                    │
+│      └─ Send to backend                                         │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+         │
+         │ [WebSocket Connected]
+         ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ BACKEND SYNC HANDLER                                            │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  [Process offline_sync Message]                                 │
+│      ├─ Parse offline_events array (chronological)              │
+│      ├─ For each event:                                         │
+│      │    ├─ Apply stat deltas via PetProfileService            │
+│      │    ├─ Check level-up thresholds                          │
+│      │    ├─ Trigger evolution if needed                        │
+│      │    └─ Log to database                                    │
+│      │                                                           │
+│      ├─ Validate final state (clamp to 0-100)                   │
+│      ├─ Return authoritative pet_status                         │
+│      └─ Send to frontend                                        │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+         │
+         │ [Receive pet_status]
+         ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ FRONTEND SYNC COMPLETION                                        │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  [OfflineGameEngine: Stop]                                      │
+│      ├─ Decay thread terminates                                 │
+│      └─ Feed handler cleanup                                    │
+│                                                                  │
+│  [OfflineEventJournal: Mark Synced]                             │
+│      ├─ Update all sent events: synced=1                        │
+│      └─ Optionally clear_synced() to free space                 │
+│                                                                  │
+│  [PetState: Update]                                             │
+│      ├─ Replace local state with backend authoritative          │
+│      ├─ Update display stat bars                                │
+│      └─ Trigger animations (evolution, badges, etc.)            │
+│                                                                  │
+│  [StatusDisplay: Clear Offline]                                 │
+│      ├─ Amber LED: off                                          │
+│      ├─ Remove "Chế độ ngoại tuyến" label                       │
+│      └─ Resume audio mode                                       │
+│                                                                  │
+│  [ONLINE MODE ACTIVE]                                           │
+│      Ready for normal WebSocket voice interaction               │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Configuration
+
+**Constants (in `aimon-frontend/config.py`):**
+```python
+OFFLINE_EVENT_MAX = 1000              # Max journal events
+OFFLINE_DECAY_INTERVAL_S = 60         # Seconds between stat decay
+OFFLINE_FEED_COOLDOWN_S = 30          # Seconds between feeds
+OFFLINE_FEED_HUNGER_REDUCTION = 15    # Hunger decrease per feed
+OFFLINE_XP_INTERACTION = 5            # XP per button tap
+OFFLINE_XP_FEED = 3                   # XP per successful feed
+OFFLINE_DB_PATH = TURN_DB_PATH        # Reuse turn_logger DB
+```
+
+### Key Design Decisions
+
+1. **Visual-Only Gameplay:** No audio processing offline simplifies implementation and reduces battery drain
+2. **Daemon Thread:** Background decay thread ensures continuous stat updates without blocking UI
+3. **SQLite Persistence:** Event journal survives app restarts or crashes
+4. **Auto-Prune:** Max 1000 events prevents unbounded storage growth
+5. **Exponential Backoff:** Reduces connection attempts when WiFi unavailable, prevents battery drain
+6. **Last-Write-Wins Sync:** Backend state takes precedence; ensures data consistency
+7. **No Evolution Offline:** Evolution deferred to backend; prevents divergence
+8. **30s Feed Cooldown:** Prevents abuse, requires meaningful player engagement
+9. **Response Bank:** 75 curated Vietnamese phrases prevent repetitive feedback
+10. **Amber LED Indicator:** Hardware signal of offline state (non-intrusive)
 
 ---
 

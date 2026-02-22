@@ -1,7 +1,7 @@
 # AI-MON Documentation Index
 
-**Last Updated:** 2026-02-15
-**Project:** aimon-backend (v0.2 Production Ready)
+**Last Updated:** 2026-02-22
+**Project:** aimon-backend (v0.2+ with Offline Resilience - Phase 10 Complete)
 
 Welcome to the AI-MON documentation suite. Use this index to find the right guide for your needs.
 
@@ -106,7 +106,7 @@ Best for: Getting the system running
 
 ---
 
-### 5. [Project Overview & PDR](./project-overview-pdr.md) — 780 LOC
+### 5. [Project Overview & PDR](./project-overview-pdr.md) — 800+ LOC
 **Product requirements and project roadmap**
 
 Best for: Understanding what the project does and where it's going
@@ -114,7 +114,7 @@ Best for: Understanding what the project does and where it's going
 - Functional requirements (8 FRs)
 - Non-functional requirements (performance, scalability, etc.)
 - Architecture requirements
-- Implementation phases (Phases 1-5 complete, Phases 6-7 planned)
+- Implementation phases (Phases 1-10 complete)
 - Success criteria and metrics
 - Risk assessment
 - Timeline and roadmap
@@ -122,6 +122,22 @@ Best for: Understanding what the project does and where it's going
 - Glossary of terms
 
 **Time to read:** 40-60 minutes
+
+---
+
+### 6. [Project Changelog](./project-changelog.md) — 300+ LOC (NEW)
+**Detailed record of all significant changes, features, and fixes**
+
+Best for: Understanding what was built and when
+- Phase-by-phase feature breakdown
+- Breaking changes and migration paths
+- Performance impact of changes
+- Database schema evolution
+- Files changed per phase
+- Security considerations
+- Testing coverage per phase
+
+**Time to read:** 15-30 minutes (reference document)
 
 ---
 
@@ -185,11 +201,12 @@ Best for: Understanding what the project does and where it's going
 | Document | Size | LOC | Time to Read |
 |----------|------|-----|--------------|
 | Codebase Summary | 16 KB | 475 | 20-30 min |
-| System Architecture | 26 KB | 598 | 30-45 min |
+| System Architecture | 35 KB | 700+ | 40-50 min |
 | Code Standards | 25 KB | 957 | 45-60 min |
 | Deployment Guide | 20 KB | 864 | 30-90 min |
-| Project Overview & PDR | 23 KB | 780 | 40-60 min |
-| **Total** | **110 KB** | **3,674** | **3-5 hours** |
+| Project Overview & PDR | 25 KB | 800+ | 40-60 min |
+| Project Changelog | 18 KB | 300+ | 15-30 min |
+| **Total** | **139 KB** | **4,100+** | **3.5-5 hours** |
 
 **Recommendation:** Read all documents for comprehensive understanding (~5 hours total). Reference specific documents as needed during development.
 
@@ -257,6 +274,9 @@ Best for: Understanding what the project does and where it's going
 | How do services communicate? | System Architecture | Service Communication |
 | How do I debug issue X? | Deployment Guide | Troubleshooting |
 | What's the roadmap? | Project Overview & PDR | Timeline & Roadmap |
+| What was built in Phase X? | Project Changelog | Phase X section |
+| What breaking changes happened? | Project Changelog | Version section |
+| How do I handle offline gameplay? | System Architecture | Offline Resilience System |
 
 ---
 
@@ -288,6 +308,7 @@ Documentation should make development faster, not slower. Your feedback helps im
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.1 | 2026-02-22 | Added Project Changelog; Phase 10 offline resilience documentation |
 | 1.0 | 2026-02-15 | Initial documentation suite: 5 documents, 3,674 LOC |
 
 ---
