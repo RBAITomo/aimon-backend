@@ -1,14 +1,14 @@
 # AI-MON Project Overview & Product Development Requirements
 
 **Last Updated:** 2026-02-22
-**Status:** v0.2+ Production Ready (Phase 10 complete)
-**Project Phase:** 10 of 10 (Offline Resilience & Tamagotchi Sync) - COMPLETE
+**Status:** v0.2+ Production Ready (Phase 11 complete)
+**Project Phase:** 11 of 11 (Tasteless Combat & Memory Shard System) - COMPLETE
 
 ---
 
 ## Executive Summary
 
-**AI-MON** (AI-driven Mentor for Children) is a voice-driven AI companion system designed for Raspberry Pi, enabling Vietnamese children to have interactive conversations with an AI personality. The system combines speech recognition, large language models, memory persistence, and safety filtering to create an engaging, educational companion.
+**AI-MON** (AI-driven Mentor for Children) is a voice-driven AI companion system designed for Raspberry Pi, enabling Vietnamese children to have interactive conversations with an AI personality. The system combines speech recognition, large language models, memory persistence, safety filtering, turn-based combat encounters, and progressive lore discovery to create an engaging, educational companion.
 
 **v0.2+ Highlights:**
 - Clean, focused microservices architecture
@@ -21,6 +21,8 @@
 - Enhanced Food Feeding UX: On-screen food sprite animations with tween effects (Phase 9)
 - Offline Resilience: Tamagotchi-style gameplay, SQLite event journal, stat decay engine (Phase 10)
 - Seamless Reconnection: Exponential backoff WebSocket reconnect, event sync via backend (Phase 10)
+- Tasteless Combat System: Random turn-based encounters, stat-based power calculations (Phase 11)
+- Memory Shard Progression: Level-gated lore discovery, Noir quest arc (Phase 11)
 
 **Target Users:**
 - Children ages 5-12 (Vietnamese-speaking)
@@ -601,6 +603,112 @@ PowerMem Tables (Managed by memoryservice)
 - [x] Thread-safe implementation (Lock + check_same_thread=False)
 - [x] No hardcoded values (all in config.py)
 - [x] Clean error handling (graceful fallback on sync failure)
+
+---
+
+### Phase 11: Tasteless Combat & Memory Shard System ✅ COMPLETE
+
+**Purpose:** Add turn-based combat encounters and progressive lore discovery system with Noir final arc.
+
+**Combat System:**
+- **TastelessSpawnService:** Random encounter spawning (configurable spawn chance, gated by pet level)
+- **CombatService:** Turn-based battle orchestration (ATTACK, DEFEND, SPECIAL, FLEE actions)
+- **CombatPowerCalculator:** Stat-based power formula (level * 10 + hunger/10 + energy/10 + happiness/20)
+- **CombatResultHandler:** Win/loss logic, XP/shard reward distribution
+- **CombatSessionState:** Turn tracking (user action, enemy action, round results)
+- **TastelessConfig entity:** Combat balance configuration (spawn probabilities, power variance)
+- **CombatLog entity:** Combat history for progression tracking
+- **New Messages:** TASTELESS_WARNING, COMBAT_START, COMBAT_ROUND, COMBAT_RESULT, COMBAT_SPECIAL
+
+**Memory Shard System:**
+- **ShardService:** Tracks user unlocked lore shards (20% drop chance per combat win)
+- **LocationService:** World location navigation (Cotton Land geography unlocked by shards)
+- **UserShard entity:** Links pet to unlocked lore shards + Noir quest progress
+- **UserShardRepository:** Queries user shard state
+- **Level-gated progression:** Beginner (L1-5), Adventure (L6-10), Final (L11+) shard tiers
+- **New Messages:** SHARD_UNLOCKED, LOCATION_UNLOCK, LOCATION_CHANGED, LOCATION_SWITCH
+
+**Noir Quest Arc:**
+- **NoirQuestService:** Multipart question sequence (10 questions per arc)
+- **NoirResponseEvaluator:** LLM-based answer grading (0-10 score, ≥7 correct)
+- **FinalArcService:** Final arc unlock conditions (≥3 shards + ≥5 correct answers)
+- **NoirQuestionBank:** 50+ ranked questions with rubrics
+- **pet_profiles.noir_last_attempt:** 24h rate limit on final arc retries
+- **New Messages:** FINAL_ARC_UNLOCK, NOIR_QUEST_START, NOIR_QUEST_RESULT
+- **New CDI Events:** TastelessEncounterEvent, CombatWonEvent, CombatLostEvent, CombatRoundEvent, ShardUnlockedEvent, LocationUnlockEvent, FinalArcUnlockEvent
+
+**Database Migrations:**
+- **V6:** tasteless_config table + combat_log table + seed data (20 config profiles)
+- **V7:** noir_last_attempt field + 50+ Noir lore entries (questions & answer rubrics)
+
+**Deliverables:**
+- 11 new Java services (combat: 5, world/shard: 6)
+- 3 new entities (TastelessConfig, CombatLog, UserShard)
+- 3 new repositories (TastelessConfigRepository, CombatLogRepository, UserShardRepository)
+- 2 new database migrations (V6, V7)
+- 7 new WebSocket message routes (AimonWebSocket)
+- 7 new CDI event types (PetEventBridge observers)
+- 25+ message route handlers in PetMessageHandler
+
+### Phase 11 Completion Checklist ✅
+
+#### Combat System
+- [x] TastelessSpawnService (spawn probability, level gating)
+- [x] CombatService (turn-based flow, action resolution)
+- [x] CombatResultHandler (win/loss rewards)
+- [x] CombatPowerCalculator (stat formula)
+- [x] CombatSessionState (turn tracking)
+- [x] TastelessConfig entity & repository
+- [x] CombatLog entity & repository
+- [x] Combat WebSocket messages (5 types)
+- [x] Modified ConversationProcessService (spawn check on completion)
+- [x] Modified PetProfileService.applyStatPenalty (combat loss penalties)
+
+#### Memory Shard System
+- [x] ShardService (unlock tracking)
+- [x] LocationService (world navigation)
+- [x] UserShard entity & repository
+- [x] Level-gated shard progression (3 tiers)
+- [x] Shard lore injection into conversation context
+- [x] Shard/location WebSocket messages (4 types)
+
+#### Noir Quest Arc
+- [x] NoirQuestService (multipart questions)
+- [x] NoirResponseEvaluator (LLM grading)
+- [x] FinalArcService (unlock conditions)
+- [x] NoirQuestionBank (50+ questions)
+- [x] Noir final arc messages (3 types)
+- [x] noir_last_attempt rate limiting (24h cooldown)
+
+#### Database & Migrations
+- [x] V6 migration (tasteless_config, combat_log)
+- [x] V7 migration (noir_last_attempt, Noir lore)
+- [x] Seed data (20 config profiles, 50+ questions)
+
+#### Testing & Validation
+- [x] Unit tests: combat power calculation
+- [x] Unit tests: spawn probability by level
+- [x] Unit tests: shard unlock & progression
+- [x] Unit tests: Noir response evaluation
+- [x] Unit tests: final arc unlock conditions
+- [x] Integration tests: full combat flow
+- [x] Integration tests: offline → combat transition
+
+#### Documentation
+- [x] Updated system-architecture.md (Combat + Shard sections)
+- [x] Updated codebase-summary.md (new services/entities)
+- [x] Updated project-overview-pdr.md (Phase 11 details)
+- [x] Combat flow diagrams (spawn → battle → reward)
+- [x] Shard progression diagram (level tiers)
+- [x] Noir quest arc documentation
+
+#### Code Quality (Phase 11 Specific)
+- [x] 11 new Java services (~1,120 LOC total)
+- [x] 3 new entities + 3 repositories
+- [x] 2 database migrations (Flyway)
+- [x] CDI event-driven architecture
+- [x] Stat-based combat balancing
+- [x] LLM-based answer grading
 
 ---
 

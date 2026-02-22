@@ -1,11 +1,11 @@
 # AI-MON Codebase Summary
 
-**Last Updated:** 2026-02-20
-**Status:** Phase 3 Complete — Adaptive Interest System Integration
+**Last Updated:** 2026-02-22
+**Status:** Phase 11 Complete — Tasteless Combat + Memory Shard System Integration
 
 ## Overview
 
-AI-MON is a voice-driven AI companion for Raspberry Pi with personality, memory, safety filtering, world lore immersion, and on-device camera vision. The refactored `aimon-backend` is a clean, focused Java/Quarkus backend. Phase 7 adds interactive pet game mechanics: SFX feedback, dynamic badges, quest system, pet evolution/regression/transformation, and 4-layer display compositor. Phase 8 adds world lore system: Cotton Land contextual facts injected into conversations based on pet level and child interests.
+AI-MON is a voice-driven AI companion for Raspberry Pi with personality, memory, safety filtering, world lore immersion, and on-device camera vision. The refactored `aimon-backend` is a clean, focused Java/Quarkus backend. Phase 7 adds interactive pet game mechanics: SFX feedback, dynamic badges, quest system, pet evolution/regression/transformation, and 4-layer display compositor. Phase 8 adds world lore system: Cotton Land contextual facts injected into conversations based on pet level and child interests. Phase 11 adds Tasteless Combat system: random encounters, turn-based battles, stat-based power calculations, and Memory Shard progression system with Noir quest arc.
 
 **Metrics:**
 - **File Reduction:** 90 → 47 files (48% reduction)
@@ -58,8 +58,12 @@ src/main/java/dev/aimon/
 │   ├── Parent
 │   ├── User               # Child profiles
 │   ├── BannedKeyword      # Kid Mode safety lists
-│   └── world/
-│       └── WorldLore      # World lore entries (Phase 8)
+│   ├── world/
+│   │   ├── WorldLore      # World lore entries (Phase 8)
+│   │   └── UserShard      # Shard discovery tracking (Phase 11)
+│   └── combat/
+│       ├── TastelessConfig  # Combat encounter config & balancing (Phase 11)
+│       └── CombatLog        # Combat history & results (Phase 11)
 │
 ├── model/                 # Domain models
 │   ├── RobotSession       # WebSocket session state
@@ -67,7 +71,7 @@ src/main/java/dev/aimon/
 │   ├── ConversationSession  # Conversation context
 │   └── AudioFrame         # Audio packet wrapper
 │
-├── service/               # Business logic (6 subpackages)
+├── service/               # Business logic (9 subpackages)
 │   ├── ai/                # LLM orchestration
 │   │   └── LiteLlmAIService (206 LOC)
 │   │
@@ -78,7 +82,7 @@ src/main/java/dev/aimon/
 │   │   └── OpusCodecService      # OPUS decoder only
 │   │
 │   ├── conversation/      # Conversation orchestration
-│   │   ├── ConversationProcessService (298 LOC)
+│   │   ├── ConversationProcessService (298 LOC, +spawn check + Noir context)
 │   │   └── ConversationSessionManager (241 LOC)
 │   │
 │   ├── memory/            # PowerMem integration
@@ -102,13 +106,33 @@ src/main/java/dev/aimon/
 │   │   ├── TopicClassifier (~130 LOC)     # Keyword + LLM-based topic classification
 │   │   └── AdaptiveInterestService (~100 LOC) # Derives top interests from timeline
 │   │
-│   ├── world/             # World lore system (Phase 8)
-│   │   └── WorldLoreService (~75 LOC)     # Fetches & ranks lore, formats prompt
+│   ├── world/             # World lore + shard system (Phase 8, 11)
+│   │   ├── WorldLoreService (~75 LOC)     # Fetches & ranks lore, formats prompt
+│   │   ├── ShardService (~120 LOC)        # Shard unlock tracking & progression (Phase 11)
+│   │   ├── LocationService (~100 LOC)     # Location navigation & world state (Phase 11)
+│   │   ├── NoirQuestService (~150 LOC)    # Noir quest arc orchestration (Phase 11)
+│   │   ├── FinalArcService (~80 LOC)      # Final arc unlock conditions (Phase 11)
+│   │   ├── NoirResponseEvaluator (~90 LOC) # Question response grading (Phase 11)
+│   │   └── NoirQuestionBank (~120 LOC)    # Question pool & retrieval (Phase 11)
 │   │
-│   └── SentenceSplitterService (218 LOC)   # Sentence-splitting for TTS
+│   ├── combat/            # Tasteless combat system (Phase 11)
+│   │   ├── TastelessSpawnService (~110 LOC) # Random encounter spawning & conditions
+│   │   ├── CombatService (~180 LOC)        # Combat flow orchestration
+│   │   ├── CombatResultHandler (~100 LOC)  # Win/loss logic & rewards
+│   │   ├── CombatPowerCalculator (~80 LOC) # Stat-based power formula
+│   │   └── CombatSessionState (~60 LOC)    # Combat turn state tracking
+│   │
+│   └── pet/               # Pet profile management
+│       ├── PetProfileService (applyStatPenalty for combat losses)
+│       └── PetEventBridge (combat/shard/location observers)
 │
 ├── repository/            # Data access layer
-│   └── WorldLoreRepository            # Query world_lore table
+│   ├── WorldLoreRepository            # Query world_lore table
+│   ├── world/
+│   │   └── UserShardRepository        # Query user_shards table (Phase 11)
+│   └── combat/
+│       ├── TastelessConfigRepository  # Query tasteless_config table (Phase 11)
+│       └── CombatLogRepository        # Query combat_log table (Phase 11)
 │
 └── websocket/             # WebSocket v4 protocol handler
     └── AimonWebSocket (277 LOC)  # Push-to-talk endpoint
@@ -190,12 +214,14 @@ aimon-frontend/
 ## Key Classes
 
 ### WebSocket Handler
-**`AimonWebSocket` (277 LOC)**
+**`AimonWebSocket` (277 LOC, +16 new combat/shard message routes)**
 - Endpoint: `ws://localhost:8080/ws/audio/{robotId}`
-- Protocol: v4 (push-to-talk, simplified) + 9 new pet message types (Phase 7)
-- States: IDLE → LISTENING → PROCESSING → RESPONDING + quest/evolution overlays
+- Protocol: v4 (push-to-talk, simplified) + 25 message types (Phase 7, 11)
+- States: IDLE → LISTENING → PROCESSING → RESPONDING + quest/evolution/combat overlays
 - Handles: hello, audio_start, audio frames, audio_stop, interrupt, ping/pong
 - Pet messages: pet_status, pet_feed_result, badge_earned, pet_evolution, pet_transform, pet_warning, pet_regression, quest_start, camera_result
+- Combat messages (Phase 11): TASTELESS_WARNING, COMBAT_START, COMBAT_ROUND, COMBAT_RESULT, COMBAT_SPECIAL
+- Shard/Location messages (Phase 11): SHARD_UNLOCKED, LOCATION_UNLOCK, LOCATION_CHANGED, LOCATION_SWITCH, FINAL_ARC_UNLOCK, NOIR_QUEST_START, NOIR_QUEST_RESULT
 
 ### Audio Pipeline
 **`AudioPipelineService`**
@@ -337,6 +363,16 @@ class PetState:
 | **SentenceSplitterService** | Sentence chunking | 218 | ✅ Imported |
 | **GoogleSttService** | Speech recognition | ~100 | ✅ Clean |
 | **ContextRetrievalService** | Memory retrieval | 247 | ✅ Imported |
+| **TastelessSpawnService** | Combat encounter spawning | ~110 | ✅ Phase 11 |
+| **CombatService** | Combat flow orchestration | ~180 | ✅ Phase 11 |
+| **CombatResultHandler** | Combat result processing | ~100 | ✅ Phase 11 |
+| **CombatPowerCalculator** | Power formula calculation | ~80 | ✅ Phase 11 |
+| **ShardService** | Shard progression & unlock | ~120 | ✅ Phase 11 |
+| **LocationService** | World location navigation | ~100 | ✅ Phase 11 |
+| **NoirQuestService** | Noir quest arc orchestration | ~150 | ✅ Phase 11 |
+| **FinalArcService** | Final arc unlock conditions | ~80 | ✅ Phase 11 |
+| **NoirResponseEvaluator** | Question response grading | ~90 | ✅ Phase 11 |
+| **NoirQuestionBank** | Question pool management | ~120 | ✅ Phase 11 |
 
 ---
 
@@ -517,16 +553,24 @@ PCM16 Audio Chunks
 | `users` | Child profiles | Links to parents |
 | `banned_keywords` | Safety filtering | Kid Mode content blocks |
 | `world_lore` | World context entries | Phase 8: Cotton Land facts, gated by level/shard |
-| `user_shards` | User lore discovery tracking | Phase 2b planned: track unlocked lore entries |
-| `pet_profiles` | Pet state + world fields | Added: active_world, current_location (Phase 8) |
+| `user_shards` | User lore discovery tracking | Phase 11: Unlocked memory shards + Noir progress |
+| `pet_profiles` | Pet state + world fields | Added: active_world, current_location, noirLastAttempt (Phase 11) |
+| `tasteless_config` | Combat balance config | Phase 11: Spawn chance, power cap, difficulty curve |
+| `combat_log` | Combat history & results | Phase 11: Winner, loser, round count, XP earned |
 | PowerMem tables | 3-layer memory | Managed by memoryService |
 
 **Dropped from backyard:** stories, story_chunks, session_logs, robot_entities, MoE tables, face vectors.
 
 **Phase 8 Additions:**
 - `world_lore`: 30+ Cotton Land entries (geography, characters, items, events)
-- `user_shards`: Ready for future progression-based discovery system
+- `user_shards`: Track unlocked lore entries
 - `pet_profiles`: Now tracks active world and location for multi-world support
+
+**Phase 11 Additions:**
+- `tasteless_config`: Combat encounter configuration (spawn probability, power scaling)
+- `combat_log`: Combat records for progression tracking and analytics
+- `user_shards`: Extended with Noir quest progress (questions answered, current arc)
+- `pet_profiles`: Added `noirLastAttempt` timestamp for rate limiting final arc attempts
 
 ---
 
@@ -601,6 +645,51 @@ PCM16 Audio Chunks
 - **Feed flow:** Pi camera → Gemini (with sprite_key) → backend pet_feed_confirm → frontend FoodSpriteManager → on-screen food animation
 - **UX Features:** Food sprites animate toward pet mouth, auto-eat on hunger rise or timer, max 3 concurrent sprites in queue
 - **Sprite assets:** Kebab-case filenames (apple.png, rice.png, milk-bottle.png) match sprite_key from Gemini
+
+### Phase 11: Tasteless Combat + Memory Shard System ✅
+**Combat System:**
+- **New:** `TastelessSpawnService` — Random encounter spawning on TTS completion (configurable spawn chance)
+- **New:** `CombatService` — Turn-based battle orchestration (player vs. Tasteless)
+- **New:** `CombatResultHandler` — Win/loss logic, XP/shard reward distribution
+- **New:** `CombatPowerCalculator` — Stat-based power formula (level, hunger, energy, happiness)
+- **New:** `CombatSessionState` — Combat turn tracking (user choice, enemy choice, round results)
+- **New:** `TastelessConfig` entity — Combat balance configuration (spawn probabilities, difficulty multipliers)
+- **New:** `CombatLog` entity — Combat history for progression tracking
+- **Modified:** `ConversationProcessService` — Added spawn check on conversation completion
+- **Modified:** `PetProfileService.applyStatPenalty()` — Stat penalties for combat losses (hunger +10, energy -15)
+- **Modified:** `PetEventBridge` — Observes TastelessEncounterEvent, CombatWonEvent, CombatLostEvent, CombatRoundEvent
+
+**Memory Shard System:**
+- **New:** `ShardService` — Tracks user unlocked memory shards (lore entries discovered via combat)
+- **New:** `LocationService` — World location navigation state management
+- **New:** `UserShard` entity — Links pet to unlocked lore shards + progress metadata
+- **New:** `UserShardRepository` — Queries user shard state
+- **Modified:** `ConversationProcessService` — Injects unlocked shard context into Noir conversations
+
+**Noir Quest Arc:**
+- **New:** `NoirQuestService` — Noir final arc orchestration (multipart question sequence)
+- **New:** `NoirResponseEvaluator` — LLM-based response grading against answer rubrics
+- **New:** `FinalArcService` — Final arc unlock conditions (must have N shards + pass Noir questions)
+- **New:** `NoirQuestionBank` — Question pool & retrieval (tier-based difficulty)
+- **New:** Migrations V7 — Noir lore entries + Noir last attempt tracking
+- **Modified:** `pet_profiles.noir_last_attempt` timestamp — Rate limits final arc retries (24h cooldown)
+
+**New WebSocket Message Types:**
+- Combat: `TASTELESS_WARNING`, `COMBAT_START`, `COMBAT_ROUND`, `COMBAT_RESULT`, `COMBAT_SPECIAL`
+- Shard/Location: `SHARD_UNLOCKED`, `LOCATION_UNLOCK`, `LOCATION_CHANGED`, `LOCATION_SWITCH`, `FINAL_ARC_UNLOCK`, `NOIR_QUEST_START`, `NOIR_QUEST_RESULT`
+
+**New CDI Events:**
+- `TastelessEncounterEvent` — Combat initiated
+- `CombatWonEvent` — Player victory (XP, shard reward)
+- `CombatLostEvent` — Player defeat (stat penalties)
+- `CombatRoundEvent` — Round result update
+- `ShardUnlockedEvent` — New shard discovered
+- `LocationUnlockEvent` — New location accessible
+- `FinalArcUnlockEvent` — Noir final arc unlocked
+
+**Database Migrations:**
+- **V6:** tasteless_config table + combat_log table + seed data
+- **V7:** noir_last_attempt field + Noir lore entries (50+ questions)
 
 ### Features Kept
 - PowerMem 3-layer memory ✅

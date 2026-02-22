@@ -201,6 +201,119 @@ None. Offline mode is opt-in; online mode behavior unchanged.
 
 ---
 
+### [WiFi QR Manager] Quick WiFi Reconnection — 2026-02-22
+
+**Status:** IMPLEMENTED (New Feature)
+
+**Scope:** Enable scanning WiFi QR codes in offline mode for quick reconnection without manual text entry.
+
+#### New Features
+
+- **WifiManager class** (`hardware/wifi-manager.py`)
+  - `scan_qr_for_wifi(jpeg_bytes)`: Decode WiFi QR code using pyzbar, regex parse WiFi format
+  - `add_profile(ssid, password)`: Persist profiles to JSON, dedup by SSID
+  - `connect_to_profile(ssid, password)`: Connect via nmcli with 30s timeout
+  - `get_profiles()`: Load saved profiles for quick reconnect
+  - Lazy imports: pyzbar/PIL only loaded on demand (dev-friendly)
+
+- **QR Format Support**
+  - Standard WiFi QR: `WIFI:S:<SSID>;T:<WPA|WEP>;P:<password>;`
+  - Regex validation & extraction
+  - 15-second decode timeout prevents hangs
+
+- **Button Integration**
+  - Long-press (≥1.5s) in offline mode triggers WiFi QR scan
+  - LED feedback: bright cyan (LED_WIFI_SCAN) during scan
+  - Text bubble feedback: "Kết nối thành công!" or error messages
+  - Automatic reconnection to backend after successful WiFi connect
+
+- **Profile Persistence**
+  - Profiles stored in `data/wifi-profiles.json`
+  - Format: JSON array with {ssid, password, type}
+  - Deduped by SSID — rescanning updates password
+  - Last_used field for quick reconnect
+
+#### New Dependencies
+
+- **Python:** `pyzbar>=0.1.9`, `Pillow>=10.0.0`
+- **System:** `libzbar0` (QR decoder library)
+- **Tools:** `nmcli` (NetworkManager CLI)
+
+#### Configuration Updates
+
+**New constants in `config.py`:**
+```python
+WIFI_PROFILES_PATH = "data/wifi-profiles.json"      # Profile persistence
+WIFI_QR_SCAN_TIMEOUT_S = 15                         # QR decode timeout
+LED_WIFI_SCAN = (0, 200, 255)                       # Bright cyan LED
+LONG_PRESS_THRESHOLD_MS = 1500                      # Long-press trigger (≥1.5s)
+```
+
+**camera-capture-service.py enhancement:**
+- Added `bypass_rate_limit` parameter for WiFi scan (bypass 30s camera cooldown)
+- Allows rapid WiFi QR scans without delay
+
+#### Architecture
+
+```
+[Offline Mode + Button Long-Press ≥1.5s]
+    ↓
+[LED: bright cyan, camera captures JPEG]
+    ↓
+[WifiManager.scan_qr_for_wifi(jpeg_bytes)]
+    ├─ Success: add_profile(), connect_to_profile()
+    │   → Display "Kết nối thành công!"
+    │   → Trigger backend reconnection
+    │
+    └─ Failure: display error message, return to offline
+```
+
+#### Files Changed
+
+**New:**
+- `aimon-frontend/hardware/wifi-manager.py` (~125 LOC)
+
+**Modified:**
+- `aimon-frontend/config.py` — Added WIFI_* constants
+- `aimon-frontend/requirements.txt` — Added pyzbar, Pillow
+- `aimon-frontend/hardware/camera-capture-service.py` — bypass_rate_limit param
+- `aimon-frontend/setup.sh` — Added libzbar0 system dependency
+
+**Documentation:**
+- `aimon-frontend/README.md` — WiFi QR Manager section, updated LED colors
+- `aimon-frontend/DEPLOYMENT.md` — WiFi setup instructions
+- `docs/system-architecture.md` — WiFi QR Manager section
+- `docs/project-changelog.md` — This entry
+
+#### Design Decisions
+
+1. **Lazy imports:** pyzbar/PIL only on demand (no bloat on dev machines)
+2. **Regex parsing:** Simple, fast QR validation without heavy dependencies
+3. **nmcli integration:** Leverages existing NetworkManager, no custom WiFi code
+4. **Profile dedup:** SSID-based key prevents duplicates, updates password on rescan
+5. **Bypass rate limit:** Camera QR scan bypasses 30s cooldown (WiFi is priority)
+6. **Text feedback:** Vietnamese UI messages guide user through scan → connect flow
+7. **No interruption:** WiFi scan runs in offline mode, doesn't require backend
+
+#### Testing Recommendations
+
+- [ ] Test QR decode with standard WiFi QR codes (WPA2, WEP)
+- [ ] Verify profile persistence and deduplication
+- [ ] Confirm nmcli connect succeeds with valid credentials
+- [ ] Test long-press threshold (1500ms) accuracy
+- [ ] Verify LED turns bright cyan during scan
+- [ ] Test error handling (invalid QR, bad credentials, timeout)
+- [ ] Check camera rate limit bypass doesn't affect other flows
+
+#### Documentation Updated
+
+- `aimon-frontend/README.md` — Feature overview, LED color table
+- `aimon-frontend/DEPLOYMENT.md` — Setup instructions, config constants
+- `docs/system-architecture.md` — Architecture, design decisions, data flow
+- `docs/project-changelog.md` — This changelog entry
+
+---
+
 ## Version 0.2 (Stable)
 
 ### [Phase 9] Enhanced Food Feeding UX — 2026-02-20

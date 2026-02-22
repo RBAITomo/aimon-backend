@@ -1,12 +1,12 @@
 # AI-MON System Architecture
 
 **Last Updated:** 2026-02-22
-**Version:** v0.2 (Phase 3: Adaptive Interests + Phase 7: Game Loop & SFX + Phase 8: World Lore + Phase 10: Offline Resilience)
-**Status:** Offline Resilience Feature Complete
+**Version:** v0.2 (Phase 3: Adaptive Interests + Phase 7: Game Loop & SFX + Phase 8: World Lore + Phase 10: Offline Resilience + Phase 11: Combat & Shards)
+**Status:** Tasteless Combat + Memory Shard System Complete
 
 ## System Overview
 
-AI-MON is a distributed voice-driven AI companion system for Raspberry Pi with a clean microservices architecture. The refactored backend (`aimon-backend`) coordinates real-time push-to-talk conversations and pet game mechanics. The frontend (`aimon-frontend`) implements interactive pet gameplay: SFX feedback, badge notifications, quest system, evolution/regression/transformation sequences, and 4-layer compositor rendering with TTS ducking on a 240x280 LCD display. Phase 7 adds full game loop mechanics; Phase 8 adds camera vision analysis on-device; Phase 10 adds offline resilience with tamagotchi-style gameplay, local stat decay, and seamless WebSocket reconnection with event synchronization.
+AI-MON is a distributed voice-driven AI companion system for Raspberry Pi with a clean microservices architecture. The refactored backend (`aimon-backend`) coordinates real-time push-to-talk conversations, pet game mechanics, and turn-based combat system. The frontend (`aimon-frontend`) implements interactive pet gameplay: SFX feedback, badge notifications, quest system, evolution/regression/transformation sequences, combat battles, and 4-layer compositor rendering with TTS ducking on a 240x280 LCD display. Phase 7 adds full game loop mechanics; Phase 8 adds camera vision analysis on-device; Phase 10 adds offline resilience with tamagotchi-style gameplay; Phase 11 adds Tasteless Combat encounters and Memory Shard progression with Noir quest arc.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -633,6 +633,110 @@ state_machine._on_pet_feed_result()      ← updates local pet stats display
 - Tween animation: 60 frames (~2 seconds @ 30 FPS) from top-center to mouth area
 - Collision detection: Simplified, position-based trigger
 - Auto-eat fallback: If pet hunger rises or 5-second timeout, auto-consume
+
+---
+
+## WiFi QR Manager (Phase 10+)
+
+**Purpose:** Enable quick WiFi credential scanning in offline mode without manual text entry.
+
+### Architecture
+
+**Hardware Integration:**
+```
+[Button Long-Press ≥1.5s in Offline Mode]
+    ↓
+[LED turns bright cyan — WiFi QR scan active]
+    ↓
+[CameraCaptureService.capture_bytes() — OV5647 CSI camera]
+    ↓
+[WifiManager.scan_qr_for_wifi(jpeg_bytes) — pyzbar QR decode]
+    ├─ Regex pattern: WIFI:S:SSID;T:security;P:password;
+    ├─ Returns: {ssid, type, password} or None
+    │
+    ├─ SUCCESS:
+    │   ├─ WifiManager.add_profile() → wifi-profiles.json (dedup by SSID)
+    │   ├─ WifiManager.connect_to_profile() → nmcli device wifi connect
+    │   ├─ Display bubble: "Kết nối thành công!" (Connected!)
+    │   └─ LED: return to appropriate state (green for LISTENING if voice available)
+    │
+    └─ FAILURE:
+        ├─ Display: "Không tìm thấy mã QR" (No QR found)
+        └─ Return to offline mode
+```
+
+### Key Components
+
+**WifiManager (hardware/wifi-manager.py):**
+```python
+class WifiManager:
+    def scan_qr_for_wifi(jpeg_bytes: bytes) -> dict | None
+        # Decode WiFi QR from JPEG, return {ssid, type, password}
+
+    def add_profile(ssid: str, password: str) -> None
+        # Save profile, dedup by SSID, update if exists
+
+    def connect_to_profile(ssid: str, password: str) -> bool
+        # Try existing NM connection, then add new and connect
+
+    def get_profiles() -> list
+        # Load saved profiles from JSON
+```
+
+**QR Format Support:**
+- Standard WiFi QR: `WIFI:S:<SSID>;T:<WPA|WEP>;P:<password>;`
+- Lazy imports: `pyzbar` and `PIL` only loaded on demand (dev machines may not have these)
+- Timeout: 15 seconds for QR scan operation
+
+### Configuration
+
+**Constants (in `config.py`):**
+```python
+WIFI_PROFILES_PATH = "data/wifi-profiles.json"      # Profile persistence
+WIFI_QR_SCAN_TIMEOUT_S = 15                         # QR decode timeout
+LED_WIFI_SCAN = (0, 200, 255)                       # Bright cyan during scan
+LONG_PRESS_THRESHOLD_MS = 1500                      # Hold ≥1.5s for QR
+```
+
+**Dependencies:**
+- `pyzbar>=0.1.9` — QR code decoder
+- `Pillow>=10.0.0` — Image processing
+- `libzbar0` — System library (apt-get)
+- `nmcli` — NetworkManager CLI (system tool)
+
+### Offline Trigger Flow
+
+```python
+# In state_machine.py / button handler
+if offline_mode and button_press_duration_ms >= LONG_PRESS_THRESHOLD_MS:
+    led.set_color(LED_WIFI_SCAN)  # Bright cyan
+
+    jpeg_bytes = camera_capture_service.capture_bytes()
+    result = wifi_manager.scan_qr_for_wifi(jpeg_bytes)
+
+    if result:
+        wifi_manager.add_profile(result['ssid'], result['password'])
+        connected = wifi_manager.connect_to_profile(
+            result['ssid'], result['password']
+        )
+        if connected:
+            # WiFi restored, trigger reconnection to backend
+            display_text("Kết nối thành công!")
+        else:
+            display_text("Không thể kết nối")
+    else:
+        display_text("Không tìm thấy mã QR")
+```
+
+### Design Decisions
+
+1. **Lazy imports:** pyzbar/PIL only imported when scan triggered (dev machines may lack these)
+2. **JPEG bytes only:** No disk I/O, direct memory processing
+3. **Dedup by SSID:** Prevents duplicate profiles, updates password if rescanned
+4. **Last-used tracking:** Stored in JSON for quick reconnect
+5. **nmcli integration:** Leverages NetworkManager CLI for WiFi connect
+6. **Rate limiting:** Camera already rate-limited (30s); QR scan timeout (15s) prevents hangs
+7. **Visual feedback:** Bright cyan LED + text bubble guides user experience
 
 ---
 
@@ -1407,6 +1511,271 @@ OFFLINE_DB_PATH = TURN_DB_PATH        # Reuse turn_logger DB
 
 ---
 
+## Tasteless Combat System (Phase 11)
+
+**Purpose:** Random turn-based battle encounters that spawn after conversation turns, with stat-based power calculations and Memory Shard rewards.
+
+### Combat Flow
+
+```
+[Conversation Ends]
+    ↓
+[ConversationProcessService triggers spawn check]
+    ├─ Calls TastelessSpawnService.shouldSpawn()
+    │   ├─ Queries TastelessConfig (spawn probability by level)
+    │   ├─ Random number generation
+    │   └─ Returns boolean
+    │
+    ├─ If YES → POST /combat/start
+    │
+    └─ If NO → Next conversation
+         ↓
+    [TastelessEncounterEvent emitted]
+         ↓
+    [Frontend displays TASTELESS_WARNING]
+         ↓
+    [CombatService.initiateCombat()]
+         ├─ Creates CombatSessionState (turn = 0, round = 0)
+         ├─ Queries pet stats (level, hunger, energy, happiness)
+         ├─ Calls CombatPowerCalculator.calculatePower(petStats)
+         │   └─ Returns: power = base + (level * 10) + (hunger/10) + (energy/10) + (happiness/20)
+         ├─ Generates random Tasteless power (between 80-200 scaled by difficulty)
+         └─ Sends COMBAT_START message
+              ├─ playerPower
+              ├─ enemyPower
+              └─ currentRound
+
+    [Player chooses action: ATTACK, DEFEND, SPECIAL, FLEE]
+         │
+         ├─ ATTACK: random(playerPower - 20, playerPower + 20)
+         ├─ DEFEND: reduce incoming damage by 30%
+         ├─ SPECIAL: 1.5x power, 40% fail chance
+         └─ FLEE: 50% success (escape), 50% fail (locked in)
+              ↓
+    [CombatService.executeRound(playerAction)]
+         ├─ Rolls enemy action (weighted toward attack)
+         ├─ Calculates damage: (playerAction - enemyAction) + variance
+         ├─ Applies defense modifier if active
+         ├─ Updates player/enemy HP
+         ├─ Checks win condition (enemy HP <= 0)
+         └─ Sends COMBAT_ROUND message
+              ├─ playerDamage
+              ├─ enemyDamage
+              ├─ playerHP
+              ├─ enemyHP
+              └─ roundNumber
+
+    [Combat Continues until WIN or LOSS]
+         │
+         ├─ WIN (enemyHP <= 0)
+         │   ├─ CombatResultHandler.handleWin()
+         │   ├─ XP reward = 50 + (roundCount * 10)
+         │   ├─ Shard reward = random unlock from pool
+         │   ├─ Emits CombatWonEvent
+         │   └─ Sends COMBAT_RESULT (victory)
+         │        ├─ xpGained
+         │        ├─ shardUnlocked (if applicable)
+         │        └─ newLevel (if level-up)
+         │
+         └─ LOSS (playerHP <= 0 OR all actions blocked)
+             ├─ CombatResultHandler.handleLoss()
+             ├─ PetProfileService.applyStatPenalty()
+             │   └─ hunger +10, energy -15
+             ├─ Emits CombatLostEvent
+             └─ Sends COMBAT_RESULT (defeat)
+                  ├─ statPenalties
+                  └─ nextSpawnChance
+```
+
+### Combat Power Calculation
+
+```java
+public class CombatPowerCalculator {
+    public int calculatePower(PetStats stats) {
+        int base = 100;  // Base power all pets start with
+        int levelBonus = stats.level * 10;
+        int hungerBonus = stats.hunger / 10;  // 0-10
+        int energyBonus = stats.energy / 10;  // 0-10
+        int happinessBonus = stats.happiness / 20;  // 0-5
+
+        return base + levelBonus + hungerBonus + energyBonus + happinessBonus;
+    }
+}
+```
+
+**Stat Impact:**
+- **Level:** Strongest factor (+10 per level) — encourages leveling
+- **Hunger:** Reduced power when hungry (lower hunger = lower power)
+- **Energy:** Reduced power when tired
+- **Happiness:** Bonus when happy (motivation boost)
+- **Special moves:** +50% damage, 40% fail rate, requires sufficient stats
+
+---
+
+## Memory Shard System (Phase 11)
+
+**Purpose:** Progressive lore discovery tied to combat victories and world exploration. Leads to Noir final arc.
+
+### Shard Progression
+
+```
+[CombatResultHandler.handleWin()]
+    ├─ Rolls shard unlock (20% chance per victory)
+    ├─ Queries ShardService.getAvailableShards(petLevel)
+    │   └─ Returns unlocked shards gated by level
+    │
+    ├─ ShardService.unlockShard(userId, shardId)
+    │   ├─ Creates UserShard entry
+    │   ├─ Stores in database
+    │   └─ Emits ShardUnlockedEvent
+    │
+    └─ Frontend displays SHARD_UNLOCKED animation
+         ├─ Shard name
+         ├─ Lore snippet
+         └─ Progress to next arc
+
+[Location System (Phase 11)]
+    ├─ Each shard unlocks access to new location
+    ├─ LocationService tracks current_location
+    ├─ Locations have:
+    │   ├─ Name (Cotton Land geography)
+    │   ├─ NPC encounters
+    │   └─ Context injection into LLM prompts
+    │
+    └─ Messages: LOCATION_UNLOCK, LOCATION_CHANGED, LOCATION_SWITCH
+
+[Noir Quest Arc (Phase 11)]
+    ├─ Unlocked after collecting N shards (default: 3)
+    ├─ NoirQuestService orchestrates multipart questions
+    ├─ NoirQuestionBank provides 50+ ranked questions
+    ├─ NoirResponseEvaluator grades answers via LLM rubric
+    ├─ FinalArcService.canUnlockFinalArc()
+    │   └─ Check: shards >= threshold AND questions answered >= threshold
+    │
+    └─ Final arc unlocks Noir character arc
+         ├─ Emits FINAL_ARC_UNLOCK
+         ├─ Noir becomes available as conversation NPC
+         └─ Special Noir responses injected
+```
+
+### Shard Gating Example
+
+```
+Level 1-5:  Beginner Shards (3 available)
+  ├─ "Cotton Fields" — Basic geography
+  ├─ "Harvest Moon" — Calendar & seasons
+  └─ "First Friends" — NPC introductions
+
+Level 6-10: Adventure Shards (5 available)
+  ├─ All Beginner shards
+  ├─ "Lost Kingdom" — Ancient history
+  ├─ "Midnight Forest" — Supernatural lore
+  └─ "Shadow Whispers" — Noir hints
+
+Level 11+:  Final Shards (7 available)
+  ├─ All previous shards
+  ├─ "Truth Unveiled" — Noir backstory
+  └─ "Ascension" — Final arc exclusive
+
+Noir Quest Arc Requirement:
+  ├─ Minimum shards collected: 3
+  ├─ Questions answered correctly: 5/10
+  └─ Time since last attempt: 24 hours
+```
+
+### Noir Response Evaluation
+
+```
+[Player answers Noir question]
+    ↓
+[NoirResponseEvaluator.evaluateResponse()]
+    ├─ Constructs LLM prompt with:
+    │   ├─ Question
+    │   ├─ Answer rubric (example good answers)
+    │   ├─ Scoring criteria (0-10)
+    │   └─ Player response
+    │
+    ├─ LLM returns score 0-10
+    ├─ Score >= 7 → Correct answer
+    ├─ Score < 7 → Incorrect, offer retry
+    │
+    └─ If all questions passed:
+         ├─ FinalArcService.unlockFinalArc(userId)
+         ├─ Emits FINAL_ARC_UNLOCK
+         └─ Noir becomes fully unlocked character
+```
+
+### Database Entities
+
+**UserShard:**
+```
+user_id (FK)
+shard_id
+discovered_at (timestamp)
+noir_question_index (0-10, tracks progress)
+noir_questions_correct (0-10)
+noir_last_attempt (timestamp, rate limit)
+```
+
+**TastelessConfig:**
+```
+difficulty_level (easy, normal, hard)
+spawn_probability (0.0-1.0)
+min_level (default 5)
+max_level (cap)
+power_variance (±20% range)
+xp_multiplier (1.0-2.0)
+shard_drop_chance (0.0-1.0)
+```
+
+**CombatLog:**
+```
+id (UUID)
+user_id (FK)
+player_power
+enemy_power
+rounds_played
+outcome (WIN, LOSS, FLEE)
+xp_earned
+shard_unlocked (if applicable)
+created_at (timestamp)
+```
+
+---
+
+## Frontend Combat Integration
+
+**New WebSocket Messages:**
+- `TASTELESS_WARNING` — Encounter initiated
+- `COMBAT_START` — Battle begins (powers, round 0)
+- `COMBAT_ROUND` — Turn result (damage, HP, round N)
+- `COMBAT_RESULT` — Battle ends (victory/defeat, rewards)
+- `COMBAT_SPECIAL` — Special move effect (critical hit animation)
+
+**Frontend Combat Handler:**
+```python
+class PetEventHandler:
+    def on_combat_start(self, message):
+        # Display combat overlay
+        # Show power bars, action buttons
+        # Enable player action selection
+        pass
+
+    def on_combat_round(self, message):
+        # Animate damage
+        # Update HP bars
+        # Display action outcome
+        pass
+
+    def on_combat_result(self, message):
+        # Show victory/defeat screen
+        # Animate XP gain / shard unlock
+        # Display stat changes
+        pass
+```
+
+---
+
 ## Future Enhancements
 
 1. **OPUS Output Encoding** — Reduce bandwidth for TTS audio
@@ -1418,6 +1787,9 @@ OFFLINE_DB_PATH = TURN_DB_PATH        # Reuse turn_logger DB
 7. **Kubernetes Migration** — Horizontal scaling
 8. **GraphQL API** — Alternative to REST
 9. **Vision: Non-food Reactions** — LLM/TTS response to scene descriptions from Gemini
+10. **Combat Difficulty Scaling** — Dynamic enemy power based on win streaks
+11. **Shard Trading System** — Exchange shards for cosmetics
+12. **Multiplayer Combat** — Pet vs. Pet battles
 
 ---
 
