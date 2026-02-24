@@ -10,6 +10,7 @@ import dev.aimon.service.audio.ResponseStreamService;
 import dev.aimon.service.conversation.ConversationSessionManager;
 import dev.aimon.service.memory.PowerMemService;
 import dev.aimon.service.pet.PetProfileService;
+import dev.aimon.service.world.WorldVocabularyService;
 import io.quarkus.websockets.next.*;
 import io.smallrye.mutiny.Uni;
 import io.smallrye.mutiny.infrastructure.Infrastructure;
@@ -56,6 +57,9 @@ public class AimonWebSocket {
 
     @Inject
     PetProfileService petProfileService;
+
+    @Inject
+    WorldVocabularyService worldVocabularyService;
 
     @OnOpen
     public void onOpen(@PathParam String petId, WebSocketConnection connection) {
@@ -184,8 +188,16 @@ public class AimonWebSocket {
                     return sendError(connection, "UNKNOWN_PET", "Pet not found: " + petId);
                 }
                 session.setUserId(resolvedUserId);
-                session.setPetStage(petProfileService.getOrCreateProfile(resolvedUserId).getStage());
+                var profile = petProfileService.getOrCreateProfile(resolvedUserId);
+                session.setPetStage(profile.getStage());
                 session.setConversation(sessionManager.getOrCreateSession(resolvedUserId.intValue(), session.getSessionId()));
+
+                // Load STT vocabulary hints for this pet's world + level
+                String worldCode = profile.getActiveWorld() != null ? profile.getActiveWorld() : "COTTON_LAND";
+                int petLevel = profile.getLevel() != null ? profile.getLevel() : 1;
+                var hints = worldVocabularyService.getVocabularyHints(worldCode, petLevel);
+                session.setSttVocabularyHints(hints);
+                LOG.debugf("Loaded %d STT vocabulary hints for world=%s, level=%d", hints.size(), worldCode, petLevel);
 
                 ObjectNode response = objectMapper.createObjectNode();
                 response.put("type", "hello_ack");
@@ -238,7 +250,7 @@ public class AimonWebSocket {
             }
 
             // Process audio pipeline
-            String transcript = audioPipeline.processAudio(frames, session.getSampleRate(), session.getAudioFormat());
+            String transcript = audioPipeline.processAudio(frames, session.getSampleRate(), session.getAudioFormat(), session.getSttVocabularyHints());
 
             if (transcript == null || transcript.trim().isEmpty()) {
                 LOG.info("No valid transcript, returning to IDLE");

@@ -7,6 +7,7 @@ import org.jboss.logging.Logger;
 
 import java.io.ByteArrayOutputStream;
 import java.util.Deque;
+import java.util.List;
 
 /**
  * Audio processing pipeline for v4 push-to-talk protocol.
@@ -34,9 +35,10 @@ public class AudioPipelineService {
      * @param audioFrames Collected audio frames during LISTENING state
      * @param sampleRate Audio sample rate (Hz)
      * @param audioFormat Audio format: "pcm16" or "opus"
+     * @param vocabularyHints World-specific terms to boost in Google STT (may be empty)
      * @return Transcript text, or null if validation fails
      */
-    public String processAudio(Deque<byte[]> audioFrames, int sampleRate, String audioFormat) {
+    public String processAudio(Deque<byte[]> audioFrames, int sampleRate, String audioFormat, List<String> vocabularyHints) {
         if (audioFrames == null || audioFrames.isEmpty()) {
             LOG.warn("No audio frames to process");
             return null;
@@ -72,7 +74,7 @@ public class AudioPipelineService {
         }
 
         // Step 4: Call STT
-        String transcript = sttOrchestrator.transcribe(sttAudio, sttSampleRate, "vi-VN", "pcm16");
+        String transcript = sttOrchestrator.transcribe(sttAudio, sttSampleRate, "vi-VN", "pcm16", vocabularyHints);
         LOG.infof("STT result: %s", transcript);
         return transcript;
     }
