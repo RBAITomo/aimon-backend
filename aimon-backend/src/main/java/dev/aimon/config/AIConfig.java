@@ -208,6 +208,11 @@ public interface AIConfig {
         @WithName("sample-rate")
         @WithDefault("16000")
         int sampleRate();
+
+        /** Boost score for vocabulary hints (0-20, higher = more likely recognized). */
+        @WithName("phrase-boost")
+        @WithDefault("15.0")
+        float phraseBoost();
     }
 
     /**

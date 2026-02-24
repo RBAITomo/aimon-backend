@@ -1,7 +1,7 @@
 # AI-MON Codebase Summary
 
-**Last Updated:** 2026-02-20
-**Status:** Phase 3 Complete — Adaptive Interest System Integration
+**Last Updated:** 2026-02-24
+**Status:** Phase 3 Complete — Adaptive Interest System Integration + Power-Save Optimizations
 
 ## Overview
 
@@ -182,8 +182,9 @@ aimon-frontend/
 - Compositor reduces display updates: 2-3 blits/frame vs. fullscreen redraws
 - SFX: 3 reserved channels (primary, notify, ambient) with TTS ducking
 - Badge/quest/evolution animations driven by WebSocket events
-- Target: 30 FPS on Pi Zero 2
+- Target: 30 FPS on Pi Zero 2; adaptive to 10 FPS during idle (Phase 3 power-save)
 - Vision: Gemini 2.5 Flash called directly from Pi (no data sent over WS)
+- **Power optimization:** Camera power-gating (-150–250 mA), adaptive FPS (-20–40 mA), backlight auto-dim (-0.1–0.3W)
 
 ---
 
@@ -690,6 +691,29 @@ docker compose logs -f aimon-backend
 - **Code Quality:** ✅ No legacy references, file size limits respected
 - **Documentation:** ✅ Comprehensive, up-to-date
 - **Docker Stack:** ✅ 5-service composition, health checks included
+
+---
+
+## Development Tools & Skills
+
+### Pixel-Art Skill
+**Location:** `./.claude/skills/pixel-art/`
+
+Generates pixel art sprites, animations, and rotations via PixelLab API (Python-based skill).
+
+**6 Generation Modes:**
+- `sprite`: Text-to-pixel-art (pixflux engine, max 400x400)
+- `style`: Style-transfer generation (bitforge engine, max 200x200)
+- `animate`: Text-driven animation frames (text engine, max 64x64)
+- `skeleton`: Skeleton-pose animation (skeleton engine, max 256x256)
+- `rotate`: Multi-direction sprite rotation (rotate engine, max 200x200)
+- `edit`: Inpaint/edit existing sprites (inpaint engine, max 200x200)
+
+**AIMON Use Case:** Generate tamagotchi creature sprites, walk cycles, directional variants, and facial expressions for pet customization and world content.
+
+**Scripts:** `generate.py`, `animate.py`, `rotate.py`, `edit.py`, `balance.py`, `pixel_art_utils.py`
+
+**Validation:** Mandatory interview required (use `--skip` to bypass). See `.claude/skills/pixel-art/references/validation-workflow.md`.
 
 ---
 

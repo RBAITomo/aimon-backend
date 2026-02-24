@@ -63,7 +63,7 @@ INSERT INTO world_lore (world_code, title, category, content, min_level, interes
 
 ('COTTON_LAND', 'Whipcream Spire — trái tim Cotton Land', 'place',
  'Tháp Kem Đánh Bông là nơi cao nhất Xứ Bông — từ trên đó có thể nhìn thấy cả 5 vùng đất trong một lần. Người ta bảo trong tháp lưu giữ mọi truyền thuyết của Xứ Bông từ thuở khai thiên lập địa. Mình đã một lần đứng ở chân tháp và ngẩng đầu nhìn lên — thấy mình thật nhỏ bé.',
- 6, ARRAY['lịch sử', 'vẻ đẹp', 'bí ẩn'], 'AMBIENT'),
+ 3, ARRAY['lịch sử', 'vẻ đẹp', 'bí ẩn'], 'AMBIENT'),
 
 ('COTTON_LAND', 'Lễ Soda Bloom ở Rừng Chua', 'tradition',
  'Nghe kể mỗi năm ở Rừng Chua có một ngày Suối Soda phun lên cao như pháo hoa — bong bóng soda bay khắp rừng, dân làng nhảy múa dưới mưa soda. Mình chưa bao giờ được xem, nhưng mỗi lần nghĩ đến lại thấy muốn thử một lần. Cậu có lễ hội nào mà cậu thích nhất không?',
@@ -273,6 +273,10 @@ INSERT INTO world_lore (world_code, title, category, content, min_level, interes
 
 ('COTTON_LAND', 'Pickleline Gate — cổng dưa cải', 'place',
  'Cổng Dưa Cải là cổng nhộn nhịp nhất còn lại — Mặn và Chua hợp tác tốt nhất trong Xứ Bông, và cổng này phản ánh điều đó. Hai Hiệp Sĩ Cá Cơm canh cổng luôn đứng đối diện nhau, một người nhìn ra Rừng Chua, một người nhìn ra Cảng Mặn. Mình hỏi họ có buồn chán không — một người nói: "Đứng đây nhìn người qua lại, mình học được nhiều hơn đọc sách."',
- 6, ARRAY['cổng', 'hợp tác', 'học hỏi'], 'AMBIENT')
+ 6, ARRAY['cổng', 'hợp tác', 'học hỏi'], 'AMBIENT'),
 
+-- Sinh vật 
+('COTTON_LAND', 'Coneko', 'ability',
+ 'Coneko là một chú mèo tạo ra bởi sự ngọt ngào của kem cốc quế và hương vani mật ong, Coneko đặc biệt rất thích ăn dâu tây chấm đường',
+ 3, ARRAY['động vật'], 'AMBIENT')
 ON CONFLICT DO NOTHING;
