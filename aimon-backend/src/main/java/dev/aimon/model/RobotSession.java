@@ -2,6 +2,7 @@ package dev.aimon.model;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -23,6 +24,9 @@ public class RobotSession {
     // Audio configuration (negotiated in hello)
     private int sampleRate;
     private String audioFormat;
+
+    // STT vocabulary hints loaded at session start (world-specific proper nouns)
+    private List<String> sttVocabularyHints = List.of();
 
     public RobotSession(String petId) {
         this.sessionId = UUID.randomUUID().toString();
@@ -58,4 +62,9 @@ public class RobotSession {
     public void setUserId(Long userId) { this.userId = userId; }
     public PetStage getPetStage() { return petStage; }
     public void setPetStage(PetStage petStage) { this.petStage = petStage; }
+    public List<String> getSttVocabularyHints() { return sttVocabularyHints; }
+    public void setSttVocabularyHints(List<String> hints) {
+        // Store immutable copy — written on hello thread, read on audio_stop thread
+        this.sttVocabularyHints = hints != null ? List.copyOf(hints) : List.of();
+    }
 }

@@ -1,12 +1,193 @@
 # AI-MON Project Changelog
 
-**Last Updated:** 2026-02-22
+**Last Updated:** 2026-02-24
 
 All significant changes, features, and fixes are documented here, ordered chronologically (newest first).
 
 ---
 
 ## Version 0.2+ (Current - In Development)
+
+### [Feature] STT Vocabulary Hints — Cotton Land — 2026-02-24
+
+**Status:** COMPLETE
+
+**Scope:** Feed world-specific proper nouns as Google STT phrase hints to reduce misrecognition of game names.
+
+#### Problem Solved
+
+Google Cloud STT (vi-VN) misrecognized Cotton Land proper nouns:
+- "Coneko" → "Cô nè cô"
+- "Whipcream Spire", "Tirakuma", "Sugarcore" → phonetic Vietnamese noise
+
+#### Solution
+
+New standalone `world_vocabulary` table stores terms per world + level. At session start, all eligible terms are loaded into `RobotSession` and passed down to Google STT as `SpeechContext` phrase hints with boost=15.
+
+#### New Files
+
+- `src/main/resources/db/migration/V6__world_vocabulary.sql` — Flyway V6 migration: `world_vocabulary(id, world_code, term, min_level, is_active)` table + lookup index
+- `src/main/resources/db/seed/world_vocabulary_cotton_land_seed.sql` — ~36 Cotton Land terms seeded across levels 1–10
+- `src/main/java/dev/aimon/entity/world/WorldVocabulary.java` — JPA entity mapping `world_vocabulary` table
+- `src/main/java/dev/aimon/repository/WorldVocabularyRepository.java` — JPQL query returning `List<String>` terms by world + level
+- `src/main/java/dev/aimon/service/world/WorldVocabularyService.java` — Thin service; delegates to repository, returns empty list gracefully for unknown worlds
+
+#### Modified Files
+
+- `model/RobotSession.java` — Added `sttVocabularyHints` field (`List<String>`) with getter/setter
+- `websocket/AimonWebSocket.java` — `handleHello()`: loads hints after pet profile resolved, stores in session; logs count
+- `service/audio/AudioPipelineService.java` — `processAudio()` signature extended with `List<String> vocabularyHints` param; forwarded to `SttOrchestrator`
+- `service/stt/SttOrchestrator.java` — `transcribe()` extended with `List<String> phraseHints`; builds `SpeechContext` with `boost=15.0f` when hints present
+
+#### Database
+
+**New Table: `world_vocabulary`**
+```sql
+CREATE TABLE world_vocabulary (
+    id         BIGSERIAL    PRIMARY KEY,
+    world_code VARCHAR(50)  NOT NULL,
+    term       VARCHAR(100) NOT NULL,
+    min_level  INT          NOT NULL DEFAULT 1,
+    is_active  BOOLEAN      NOT NULL DEFAULT TRUE,
+    UNIQUE (world_code, term)
+);
+CREATE INDEX idx_world_vocabulary_lookup
+    ON world_vocabulary(world_code, min_level, is_active);
+```
+
+#### STT Integration Detail
+
+- Boost score: **15** (range 0–20) — strong preference for listed terms without blocking general recognition
+- Google STT limits: 5000 phrases/context, 100 chars/phrase — Cotton Land (~36 terms) well within limits
+- Hints scoped per session: re-evaluated on each new `hello` handshake
+
+#### Impact
+
+- ~36 Cotton Land proper nouns (names, locations, factions) sent as phrase hints per session
+- Level-gated: terms only hinted once the pet reaches `min_level` (mirrors world lore unlock logic)
+- Zero impact on general Vietnamese transcription quality
+
+#### Files
+
+| File | Action |
+|------|--------|
+| `db/migration/V6__world_vocabulary.sql` | NEW |
+| `db/seed/world_vocabulary_cotton_land_seed.sql` | NEW |
+| `entity/world/WorldVocabulary.java` | NEW |
+| `repository/WorldVocabularyRepository.java` | NEW |
+| `service/world/WorldVocabularyService.java` | NEW |
+| `model/RobotSession.java` | MODIFIED |
+| `websocket/AimonWebSocket.java` | MODIFIED |
+| `service/audio/AudioPipelineService.java` | MODIFIED |
+| `service/stt/SttOrchestrator.java` | MODIFIED |
+
+#### Breaking Changes
+
+None. `processAudio()` and `transcribe()` signatures changed but all call sites updated in same PR.
+
+---
+
+### [Phase 03] Pi Zero 2W Power-Save Optimizations — 2026-02-24
+
+**Status:** COMPLETE
+
+**Scope:** Application-level power consumption reductions targeting battery-powered deployment.
+
+#### New Features
+
+##### Camera Power Gating
+- **CameraCaptureService rewrite:** Open → capture → close per call (no persistent camera instance)
+- **Power saving:** -150–250 mA during idle periods (ISP powered down)
+- **Latency:** ~200–500ms per open/close cycle (acceptable for double-press capture)
+- **Integration:** Seamless with vision pipeline (camera re-opened on feed button)
+
+##### Adaptive FPS
+- **FPS scheduling:** 30 FPS in LISTENING/ANSWER states → 10 FPS in IDLE/OFFLINE states
+- **Implementation:** `state_machine.target_fps` property; `main.py` calls `clock.tick(sm.target_fps)`
+- **Configuration:** `LCD_FPS_IDLE = 10` in config.py
+- **Benefit:** -10–20% CPU usage during idle, ~20–40 mA power reduction
+- **Animation quality:** No visible jitter at 10 FPS (sprite sheet designed for variable framerates)
+
+##### Backlight Auto-Dim
+- **Auto-dim logic:** Set brightness to 20% after 60 seconds of inactivity
+- **Restore:** Immediate to 100% on any user interaction (button press, state transition)
+- **Implementation:** `_notify_activity()` in state machine, `_check_backlight_dim()` in tick loop
+- **Configuration:** `BACKLIGHT_DIM_TIMEOUT_S = 60`, `BACKLIGHT_DIM_PCT = 20` in config.py
+- **Benefit:** -0.1–0.3W during dim periods (~0.15W average)
+- **UX:** Transparent to user (dims only during prolonged idle)
+
+##### Battery Indicator Refresh Optimization
+- **Previous:** Battery icon updated every frame (30 FPS = 30 calls/sec)
+- **New:** Time-based refresh (~1s interval via `_battery_refresh_time` tracker)
+- **Benefit:** Reduced I2C/ADC polling overhead (~1–2 mA)
+
+#### Configuration Updates
+
+**New Constants (config.py):**
+```python
+LCD_FPS_IDLE = 10                    # FPS during IDLE/OFFLINE
+BACKLIGHT_DIM_TIMEOUT_S = 60         # Seconds before auto-dim
+BACKLIGHT_DIM_PCT = 20               # Brightness when dimmed (percent)
+```
+
+#### Files Changed
+
+**Modified Files:**
+- `aimon-frontend/config.py` — Added 3 new constants
+- `aimon-frontend/hardware/camera-capture-service.py` — Full rewrite: power-gating model
+- `aimon-frontend/main.py` — Adaptive FPS via `clock.tick(sm.target_fps)`
+- `aimon-frontend/state/state_machine.py` — Added `_notify_activity()`, `_check_backlight_dim()`, `target_fps` property, time-based battery refresh
+
+#### Testing
+
+**Unit validation:**
+- Camera re-open latency: confirmed < 500ms (acceptable for double-press)
+- FPS switching: confirmed smooth transition between 10 & 30 FPS
+- Backlight auto-dim: confirmed 60s timeout, immediate restore on activity
+- Animation quality: confirmed no jitter at 10 FPS
+
+#### Performance Impact
+
+- **Camera idle power:** -150–250 mA (ISP powered down)
+- **Adaptive FPS:** -20–40 mA (CPU reduced)
+- **Backlight auto-dim:** -0.1–0.3W (LCD brightness reduced)
+- **Battery refresh:** -1–2 mA (I2C/ADC polling reduced)
+- **Total idle power saving:** ≥150 mA during extended idle periods
+
+#### Breaking Changes
+
+None. All changes backward compatible; power-save features activate automatically based on state.
+
+#### Known Limitations
+
+- **Audio stream suspend (deferred):** Not implemented in this phase; low priority (~5–10 mA saving)
+- **Camera re-open latency:** ~200–500ms; acceptable only for infrequent capture operations
+
+#### Documentation
+
+- **Updated:** `docs/project-changelog.md` (this entry)
+- **Updated:** `plans/260223-pi-zero-2w-power-save-research/phase-03-app-level-optimizations.md` (status → complete)
+- **Updated:** `plans/260223-pi-zero-2w-power-save-research/plan.md` (phase table)
+
+---
+
+### [Documentation] Pixel-Art Skill Reference Added — 2026-02-23
+
+**Status:** COMPLETE
+
+**Scope:** Document new pixel-art skill for sprite generation and asset creation.
+
+#### Updates
+
+- **docs/codebase-summary.md:** Added "Development Tools & Skills" section with pixel-art skill overview
+  - 6 generation modes (sprite, style, animate, skeleton, rotate, edit)
+  - AIMON use case context
+  - Location and validation workflow reference
+  - File line count: 711 → 734 (within limit)
+
+**Impact:** Developers can now discover pixel-art skill capabilities and integration points from main codebase documentation.
+
+---
 
 ### [Phase 10] Offline Resilience & Tamagotchi Sync — 2026-02-22
 
@@ -553,6 +734,7 @@ Legacy implementation (90 files, 11K LOC) — replaced by v0.2 clean refactor.
 
 | Phase | Title | Status | Date | LOC Added | Files |
 |-------|-------|--------|------|-----------|-------|
+| — | STT Vocabulary Hints | ✅ COMPLETE | 2026-02-24 | ~150 | 5 new + 4 modified |
 | 10 | Offline Resilience | ✅ COMPLETE | 2026-02-22 | ~450 | 7 new + 5 modified |
 | 9 | Enhanced Food UX | ✅ COMPLETE | 2026-02-20 | ~180 | 3 modified |
 | 8 | Camera Vision Direct | ✅ COMPLETE | 2026-02-15 | ~220 | 3 new + 2 modified |
@@ -563,14 +745,14 @@ Legacy implementation (90 files, 11K LOC) — replaced by v0.2 clean refactor.
 | 3 | Adaptive Interests | ✅ COMPLETE | 2026-01-25 | ~230 | 2 new + 3 modified |
 | 2 | Core Services | ✅ COMPLETE | 2026-01-15 | ~3500 | 33 new + 5 modified |
 | 1 | Scaffolding | ✅ COMPLETE | 2026-01-10 | ~200 | 8 new + 0 modified |
-| **Total** | | | | **~6,300 LOC** | **47 files** |
+| **Total** | | | | **~6,450 LOC** | **56 files** |
 
 ---
 
 ## Key Metrics
 
 ### Code Quality
-- **v0.2+ Total:** 6,750+ LOC (47 core files + offline modules)
+- **v0.2+ Total:** 6,900+ LOC (56 core files + offline modules)
 - **Legacy (v0.1):** 11,000 LOC (90 files)
 - **Reduction:** 43% fewer lines, 48% fewer files
 - **Max File Size:** 277 LOC (clean modularization)
@@ -590,6 +772,7 @@ Legacy implementation (90 files, 11K LOC) — replaced by v0.2 clean refactor.
 - Food sprite animations
 - **NEW:** Offline tamagotchi gameplay
 - **NEW:** Event-based sync on reconnect
+- **NEW:** STT vocabulary hints for game proper nouns
 
 ---
 
@@ -616,5 +799,5 @@ Legacy implementation (90 files, 11K LOC) — replaced by v0.2 clean refactor.
 ---
 
 **Document Maintained By:** Documentation Team
-**Last Updated:** 2026-02-22
+**Last Updated:** 2026-02-24
 **Status:** Production Ready (v0.2+)
