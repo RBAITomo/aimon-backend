@@ -282,7 +282,7 @@ public class PetProfileService {
             xpForNext,
             profile.getAffinity(),
             profile.getLoginStreak(),
-            null, null, null
+            null, null, null, null
         );
     }
 
