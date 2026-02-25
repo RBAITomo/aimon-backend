@@ -19,5 +19,6 @@ public record PetStatusDto(
     int loginStreak,
     String pendingQuestText,
     String pendingQuestCategory,
-    String pendingQuestDifficulty
+    String pendingQuestDifficulty,
+    String background
 ) {}

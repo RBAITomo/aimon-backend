@@ -10,6 +10,7 @@ import dev.aimon.dto.combat.CombatOutcome;
 import dev.aimon.dto.combat.CombatRoundDto;
 import dev.aimon.model.*;
 import dev.aimon.dto.pet.QuestDto;
+import dev.aimon.service.world.SubLocation;
 import dev.aimon.service.pet.PetLevelConfig;
 import dev.aimon.service.pet.PetProfileService;
 import dev.aimon.service.pet.QuestService;
@@ -295,6 +296,11 @@ public class PetEventBridge {
         String questCategory = quest != null ? quest.category() : null;
         String questDifficulty = quest != null ? quest.difficulty() : null;
 
+        // Resolve background from current sub-location
+        String background = SubLocation.fromCode(profile.getCurrentLocation())
+            .map(SubLocation::getBackgroundFile)
+            .orElse(null);
+
         return new PetStatusDto(
             profile.getName(),
             stage,
@@ -308,7 +314,8 @@ public class PetEventBridge {
             xpForNext,
             profile.getAffinity(),
             profile.getLoginStreak(),
-            questText, questCategory, questDifficulty
+            questText, questCategory, questDifficulty,
+            background
         );
     }
 
@@ -340,6 +347,11 @@ public class PetEventBridge {
             msg.set("quest", quest);
         }
         // quest key absent = no pending quest -> frontend clears bubble
+
+        // Include current location background so frontend can restore on connect
+        if (status.background() != null) {
+            msg.put("background", status.background());
+        }
 
         return msg;
     }
