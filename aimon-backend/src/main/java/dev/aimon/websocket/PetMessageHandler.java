@@ -400,7 +400,8 @@ public class PetMessageHandler {
             xpForNext,
             profile.getAffinity(),
             profile.getLoginStreak(),
-            questText, questCategory, questDifficulty
+            questText, questCategory, questDifficulty,
+            null
         );
     }
 
