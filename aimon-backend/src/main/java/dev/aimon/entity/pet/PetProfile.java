@@ -3,6 +3,7 @@ package dev.aimon.entity.pet;
 import dev.aimon.model.PetStage;
 import jakarta.persistence.*;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
@@ -71,6 +72,9 @@ public class PetProfile {
 
     @Column(name = "current_location", length = 50, nullable = false)
     private String currentLocation = "SWEET_DOMINION";
+
+    @Column(name = "noir_last_attempt")
+    private LocalDate noirLastAttempt;
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;
@@ -154,4 +158,6 @@ public class PetProfile {
     public void setActiveWorld(String activeWorld) { this.activeWorld = activeWorld; }
     public String getCurrentLocation() { return currentLocation; }
     public void setCurrentLocation(String currentLocation) { this.currentLocation = currentLocation; }
+    public LocalDate getNoirLastAttempt() { return noirLastAttempt; }
+    public void setNoirLastAttempt(LocalDate noirLastAttempt) { this.noirLastAttempt = noirLastAttempt; }
 }

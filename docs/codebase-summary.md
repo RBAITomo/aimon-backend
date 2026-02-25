@@ -1,11 +1,11 @@
 # AI-MON Codebase Summary
 
-**Last Updated:** 2026-02-24
-**Status:** Phase 3 Complete — Adaptive Interest System Integration + Power-Save Optimizations
+**Last Updated:** 2026-02-25
+**Status:** Phase 2c Complete — Location Travel System + Phase 3: Adaptive Interest System + Power-Save Optimizations
 
 ## Overview
 
-AI-MON is a voice-driven AI companion for Raspberry Pi with personality, memory, safety filtering, world lore immersion, and on-device camera vision. The refactored `aimon-backend` is a clean, focused Java/Quarkus backend. Phase 7 adds interactive pet game mechanics: SFX feedback, dynamic badges, quest system, pet evolution/regression/transformation, and 4-layer display compositor. Phase 8 adds world lore system: Cotton Land contextual facts injected into conversations based on pet level and child interests.
+AI-MON is a voice-driven AI companion for Raspberry Pi with personality, memory, safety filtering, world lore immersion, dynamic location travel, and on-device camera vision. The refactored `aimon-backend` is a clean, focused Java/Quarkus backend. Phase 2c adds sub-location travel within Sweet Dominion with LLM-driven markers and interest-based suggestions. Phase 7 adds interactive pet game mechanics: SFX feedback, dynamic badges, quest system, pet evolution/regression/transformation, and 4-layer display compositor. Phase 8 adds world lore system: Cotton Land contextual facts injected into conversations based on pet level and child interests.
 
 **Metrics:**
 - **File Reduction:** 90 → 47 files (48% reduction)
@@ -47,12 +47,13 @@ src/main/java/dev/aimon/
 │   ├── ApplicationConfig  # Quarkus beans
 │   └── DevPropertiesFile  # Dev environment
 │
-├── dto/                   # Data transfer objects (5 subpackages)
+├── dto/                   # Data transfer objects (6 subpackages)
 │   ├── ai/                # LiteLLM messages, requests, responses
 │   ├── conversation/      # Session DTOs
 │   ├── powermem/          # Memory service DTOs
 │   ├── tts/               # TTS request/response objects
-│   └── websocket/         # Protocol messages
+│   ├── websocket/         # Protocol messages
+│   └── world/             # World DTOs (LocationDto)
 │
 ├── entity/                # Database entities
 │   ├── Parent
@@ -67,7 +68,7 @@ src/main/java/dev/aimon/
 │   ├── ConversationSession  # Conversation context
 │   └── AudioFrame         # Audio packet wrapper
 │
-├── service/               # Business logic (6 subpackages)
+├── service/               # Business logic (7 subpackages)
 │   ├── ai/                # LLM orchestration
 │   │   └── LiteLlmAIService (206 LOC)
 │   │
@@ -79,7 +80,8 @@ src/main/java/dev/aimon/
 │   │
 │   ├── conversation/      # Conversation orchestration
 │   │   ├── ConversationProcessService (298 LOC)
-│   │   └── ConversationSessionManager (241 LOC)
+│   │   ├── ConversationSessionManager (241 LOC)
+│   │   └── TopicClassifier (~130 LOC)     # Keyword + LLM-based topic classification
 │   │
 │   ├── memory/            # PowerMem integration
 │   │   ├── PowerMemService (316 LOC)
@@ -99,13 +101,16 @@ src/main/java/dev/aimon/
 │   │   └── TtsCircuitBreaker
 │   │
 │   ├── interest/          # Adaptive interest system (Phase 3)
-│   │   ├── TopicClassifier (~130 LOC)     # Keyword + LLM-based topic classification
 │   │   └── AdaptiveInterestService (~100 LOC) # Derives top interests from timeline
 │   │
-│   ├── world/             # World lore system (Phase 8)
-│   │   └── WorldLoreService (~75 LOC)     # Fetches & ranks lore, formats prompt
-│   │
-│   └── SentenceSplitterService (218 LOC)   # Sentence-splitting for TTS
+│   └── world/             # World lore + travel system (Phase 8, 2c)
+│       ├── WorldLoreService (~75 LOC)     # Fetches & ranks lore
+│       ├── TravelService (~65 LOC)        # Sub-location travel validation & execution
+│       ├── TravelPromptBuilder (~85 LOC)  # Travel context injection (layer 1e)
+│       ├── TravelMarkerParser (~30 LOC)   # [TRAVEL:XXX] marker parsing
+│       ├── SubLocation (enum)             # 5 Sweet Dominion locations + Vietnamese aliases
+│       ├── LocationUnlockRule             # Shard-based access gates
+│       └── LocationService                # Regional location management
 │
 ├── repository/            # Data access layer
 │   └── WorldLoreRepository            # Query world_lore table
@@ -330,6 +335,9 @@ class PetState:
 | **ConversationProcessService** | Conversation orchestrator | 298 | ✅ Refactored |
 | **TopicClassifier** | Vietnamese topic classification | ~130 | ✅ Phase 3 |
 | **AdaptiveInterestService** | Interest detection & caching | ~100 | ✅ Phase 3 |
+| **TravelService** | Sub-location travel validation | ~65 | ✅ Phase 2c |
+| **TravelPromptBuilder** | Travel context injection (layer 1e) | ~85 | ✅ Phase 2c |
+| **TravelMarkerParser** | [TRAVEL:XXX] marker parsing | ~30 | ✅ Phase 2c |
 | **PowerMemService** | Memory integration | 316 | ✅ Imported |
 | **TtsProviderService** | TTS failover logic | 240 | ✅ Clean |
 | **VieNeuTtsService** | Vietnamese TTS | 263 | ✅ Imported |
@@ -556,6 +564,21 @@ PCM16 Audio Chunks
 3. **WebSocket v4 protocol** (push-to-talk)
 4. **Database migrations** (Flyway, PostgreSQL)
 5. **Integration & testing** (all phases validated)
+
+### Phase 2c: Location Travel System ✅
+- **New:** `SubLocation.java` — Enum of 5 Sweet Dominion sub-locations (Whipcream Spire, Marshmallow Meadow, Candy Lantern Town, Biscuit Hills, Vanilla Promenade)
+- **New:** `TravelService.java` — Validates and executes sub-location travel within regions
+- **New:** `TravelPromptBuilder.java` — Builds system prompt layer 1e with current location flavor text, travel suggestions, and marker instructions
+- **New:** `TravelMarkerParser.java` — Regex parser for `[TRAVEL:XXX]` markers in LLM responses
+- **New:** `LocationChangedEvent.java` — CDI event record fired on location change
+- **Modified:** `ConversationProcessService.java` — Injects travel prompt context + parses markers
+- **Modified:** `PetEventBridge.java` — Observes LocationChangedEvent → WebSocket push with background filename
+- **Modified:** `ConversationSession.java` — Tracks suggestedTravelLocations (once-per-session cap)
+- **Frontend:** `ws_client.py` + `pet-event-handler.py` — Handle location change events → background swap via WebSocket
+- **Sub-locations:** Each maps to display name, Vietnamese alias, background PNG, interest tags, parent region
+- **Travel markers:** LLM emits `[TRAVEL:LOCATION_CODE]` to trigger switches (stripped for TTS)
+- **Vietnamese aliases:** All 5 locations support Vietnamese names for natural LLM suggestions
+- **Interest-based routing:** Travel suggestions ranked by overlap with child's top interests
 
 ### Phase 3: Adaptive Interest System ✅
 - **New:** `TopicClassifier.java` — Vietnamese topic classification (keyword matching + LLM fallback)

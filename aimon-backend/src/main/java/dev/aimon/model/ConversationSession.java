@@ -33,6 +33,7 @@ public class ConversationSession {
     private volatile int cachedChildAge;
     private volatile String cachedSystemPrompt;
     private volatile java.util.List<String> cachedTopInterests;
+    private final java.util.Set<String> suggestedTravelLocations = java.util.Collections.synchronizedSet(new java.util.HashSet<>());
 
     /**
      * Creates a new conversation session with conscious context.
@@ -189,6 +190,11 @@ public class ConversationSession {
 
     /** Invalidate cached system prompt so it rebuilds on next message. */
     public void invalidateCachedPrompt() { this.cachedSystemPrompt = null; }
+
+    /** Track which sub-locations have been suggested this session (once-per-session rule). */
+    public java.util.Set<String> getSuggestedTravelLocations() { return suggestedTravelLocations; }
+    public void markTravelSuggested(String subLocationCode) { suggestedTravelLocations.add(subLocationCode); }
+    public boolean hasSuggestedTravel(String subLocationCode) { return suggestedTravelLocations.contains(subLocationCode); }
 
     @Override
     public String toString() {

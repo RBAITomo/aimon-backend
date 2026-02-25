@@ -40,4 +40,46 @@ public final class PetMessageTypes {
 
     // Server → Client: Quest start notification
     public static final String QUEST_START = "quest_start";
+
+    // --- Combat system (Phase 2b) ---
+
+    // Server → Client: Tasteless detected, warning before combat
+    public static final String TASTELESS_WARNING = "tasteless_warning";
+
+    // Server → Client: Combat has begun
+    public static final String COMBAT_START = "combat_start";
+
+    // Server → Client: Single combat round result
+    public static final String COMBAT_ROUND = "combat_round";
+
+    // Server → Client: Final combat outcome
+    public static final String COMBAT_RESULT = "combat_result";
+
+    // Client → Server: Special/Evolution move during combat
+    public static final String COMBAT_SPECIAL = "combat_special";
+
+    // --- Shard + Location system (Phase 3) ---
+
+    // Server → Client: New shard unlocked
+    public static final String SHARD_UNLOCKED = "shard_unlocked";
+
+    // Server → Client: Location now available
+    public static final String LOCATION_UNLOCK = "location_unlock";
+
+    // Server → Client: Current location changed
+    public static final String LOCATION_CHANGED = "location_changed";
+
+    // Client → Server: Request to switch location
+    public static final String LOCATION_SWITCH = "location_switch";
+
+    // --- Noir Quest + Final Arc (Phase 4) ---
+
+    // Server → Client: Final Arc unlock (all 5 milestones)
+    public static final String FINAL_ARC_UNLOCK = "final_arc_unlock";
+
+    // Server → Client: Noir quest question presented
+    public static final String NOIR_QUEST_START = "noir_quest_start";
+
+    // Server → Client: Noir quest evaluation result
+    public static final String NOIR_QUEST_RESULT = "noir_quest_result";
 }

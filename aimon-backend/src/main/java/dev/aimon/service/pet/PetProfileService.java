@@ -220,6 +220,18 @@ public class PetProfileService {
     }
 
     /**
+     * Apply combat loss penalties: increase hunger, decrease happiness.
+     */
+    @Transactional
+    public void applyStatPenalty(Long userId, int hungerIncrease, int happinessDecrease) {
+        PetProfile profile = getOrCreateProfile(userId);
+        profile.setHunger(clamp(profile.getHunger() + hungerIncrease, 0, 100));
+        profile.setHappiness(clamp(profile.getHappiness() - happinessDecrease, 0, 100));
+
+        LOG.infof("Combat penalty for user %d: hunger+%d, happiness-%d", userId, hungerIncrease, happinessDecrease);
+    }
+
+    /**
      * Update affinity stat.
      */
     @Transactional

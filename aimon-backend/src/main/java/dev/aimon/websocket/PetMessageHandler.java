@@ -9,6 +9,10 @@ import dev.aimon.dto.pet.PetStatusDto;
 import dev.aimon.entity.pet.PetProfile;
 import dev.aimon.model.PetMood;
 import dev.aimon.dto.pet.QuestDto;
+import dev.aimon.service.combat.CombatResultHandler;
+import dev.aimon.service.combat.CombatService;
+import dev.aimon.service.combat.CombatSessionState;
+import dev.aimon.service.world.LocationService;
 import dev.aimon.service.conversation.ConversationSessionManager;
 import dev.aimon.service.pet.BadgeService;
 import dev.aimon.service.pet.PetEvolutionService;
@@ -48,6 +52,18 @@ public class PetMessageHandler {
 
     @Inject
     ConversationSessionManager sessionManager;
+
+    @Inject
+    CombatSessionState combatState;
+
+    @Inject
+    CombatService combatService;
+
+    @Inject
+    CombatResultHandler combatResultHandler;
+
+    @Inject
+    LocationService locationService;
 
     @Inject
     ObjectMapper objectMapper;
@@ -291,6 +307,68 @@ public class PetMessageHandler {
         } catch (Exception e) {
             LOG.error("Failed to send sync error", e);
         }
+    }
+
+    /**
+     * Handle combat_special from client: special_move or evolution_move.
+     * Sets player input on pending combat state. Combat resolves on 5s timeout or this trigger.
+     */
+    public Uni<Void> handleCombatSpecial(String robotId, Long userId, JsonNode message, WebSocketConnection connection) {
+        if (userId == null) {
+            return sendError(connection, "NO_USER", "User ID not found");
+        }
+
+        String action = message.has("action") ? message.get("action").asText("") : "";
+        CombatSessionState.PendingCombat pending = combatState.getPending(userId);
+        if (pending == null) {
+            return sendError(connection, "NO_COMBAT", "No active combat encounter");
+        }
+
+        switch (action) {
+            case "special_move" -> combatState.setSpecialMove(userId, 1);
+            case "evolution_move" -> combatState.setEvolutionMove(userId);
+            default -> {
+                return sendError(connection, "INVALID_ACTION", "Unknown combat action: " + action);
+            }
+        }
+
+        LOG.infof("Combat special from user %d: %s", userId, action);
+        return Uni.createFrom().voidItem();
+    }
+
+    /**
+     * Handle location_switch from client. Validates unlock status server-side.
+     */
+    public Uni<Void> handleLocationSwitch(String robotId, Long userId, JsonNode message, WebSocketConnection connection) {
+        if (userId == null) {
+            return sendError(connection, "NO_USER", "User ID not found");
+        }
+        String locationCode = message.has("location") ? message.get("location").asText("") : "";
+
+        return Uni.createFrom().item(() -> {
+            io.quarkus.arc.ManagedContext rc = io.quarkus.arc.Arc.container().requestContext();
+            boolean activated = !rc.isActive();
+            if (activated) rc.activate();
+            try {
+                boolean success = locationService.switchLocation(userId, locationCode);
+                if (!success) return null;
+                sessionManager.invalidateUserCache(userId);
+                return locationCode;
+            } finally {
+                if (activated) rc.terminate();
+            }
+        })
+        .runSubscriptionOn(Infrastructure.getDefaultWorkerPool())
+        .onItem().transformToUni(result -> {
+            if (result == null) {
+                return sendError(connection, "LOCATION_LOCKED", "Location is locked or invalid");
+            }
+            ObjectNode response = objectMapper.createObjectNode();
+            response.put("type", dev.aimon.dto.pet.PetMessageTypes.LOCATION_CHANGED);
+            response.put("location", result);
+            return sendJson(connection, response)
+                .chain(() -> sendPetStatus(userId, connection));
+        });
     }
 
     /**

@@ -87,6 +87,8 @@ public class AimonWebSocket {
                     case "quest_request" -> handleQuestRequest(petId, connection);
                     case "pet_transform" -> petMessageHandler.handleTransformRequest(petId, getUserId(petId), message, connection);
                     case "offline_sync" -> petMessageHandler.handleOfflineSync(petId, getUserId(petId), message, connection);
+                    case "combat_special" -> petMessageHandler.handleCombatSpecial(petId, getUserId(petId), message, connection);
+                    case "location_switch" -> petMessageHandler.handleLocationSwitch(petId, getUserId(petId), message, connection);
                     default -> sendError(connection, "UNKNOWN_TYPE", "Unknown message type: " + type);
                 };
             } catch (Exception e) {
@@ -197,7 +199,7 @@ public class AimonWebSocket {
                 int petLevel = profile.getLevel() != null ? profile.getLevel() : 1;
                 var hints = worldVocabularyService.getVocabularyHints(worldCode, petLevel);
                 session.setSttVocabularyHints(hints);
-                LOG.debugf("Loaded %d STT vocabulary hints for world=%s, level=%d", hints.size(), worldCode, petLevel);
+                LOG.debugf("Loaded %d STT vocabulary hints for world=%s, level=%d", (Object) hints.size(), worldCode, petLevel);
 
                 ObjectNode response = objectMapper.createObjectNode();
                 response.put("type", "hello_ack");

@@ -70,10 +70,25 @@ public class ConversationProcessService {
     WorldLoreService worldLoreService;
 
     @Inject
+    dev.aimon.service.combat.TastelessSpawnService tastelessSpawnService;
+
+    @Inject
+    dev.aimon.service.world.NoirQuestService noirQuestService;
+
+    @Inject
     TopicClassifier topicClassifier;
 
     @Inject
     AdaptiveInterestService adaptiveInterestService;
+
+    @Inject
+    dev.aimon.service.world.TravelPromptBuilder travelPromptBuilder;
+
+    @Inject
+    dev.aimon.service.world.TravelMarkerParser travelMarkerParser;
+
+    @Inject
+    dev.aimon.service.world.TravelService travelService;
 
     @ConfigProperty(name = "memory.mcp.enabled", defaultValue = "true")
     boolean powerMemEnabled;
@@ -157,8 +172,9 @@ public class ConversationProcessService {
                 sentence -> {
                     LOG.infof("LLM sentence [%d]: %s", fullResponseBuilder.length(), sentence);
                     fullResponseBuilder.append(sentence).append(" ");
-                    // Strip quest marker before TTS
+                    // Strip quest and travel markers before TTS
                     String clean = questEvaluationService.stripQuestMarker(sentence);
+                    clean = travelMarkerParser.strip(clean);
                     if (!clean.isEmpty()) {
                         onSentence.accept(clean);
                     }
@@ -184,8 +200,9 @@ public class ConversationProcessService {
                         }, Infrastructure.getDefaultExecutor());
                     }
 
-                    // Strip quest marker before storing
+                    // Strip quest and travel markers before storing
                     fullResponse = questEvaluationService.stripQuestMarker(fullResponse);
+                    fullResponse = travelMarkerParser.strip(fullResponse);
 
                     // Store turn in session history (in-memory)
                     session.addTurn(request.getMessage(), fullResponse);
@@ -199,6 +216,47 @@ public class ConversationProcessService {
                     }
 
                     onComplete.run();
+
+                    // Noir quest response processing (async)
+                    Long uid = Long.parseLong(request.getUserId());
+                    if (fullResponse.contains("[NOIR_RESPONSE]")) {
+                        String childMsg = request.getMessage();
+                        CompletableFuture.runAsync(() -> {
+                            try {
+                                var result = noirQuestService.processResponse(uid, childMsg);
+                                LOG.infof("Noir quest result for user %d: passed=%s, score=%d",
+                                    uid, result.passed(), result.score());
+                            } catch (Exception e) {
+                                LOG.warnf("Noir quest processing failed: %s", e.getMessage());
+                            }
+                        }, Infrastructure.getDefaultExecutor());
+                    }
+
+                    // Travel marker processing (async)
+                    String travelCode = travelMarkerParser.parse(fullResponseBuilder.toString());
+                    if (travelCode != null) {
+                        String tCode = travelCode;
+                        CompletableFuture.runAsync(() -> {
+                            try {
+                                boolean success = travelService.travel(uid, tCode);
+                                LOG.infof("Travel for user %d to %s: %s", uid, tCode, success ? "OK" : "FAILED");
+                            } catch (Exception e) {
+                                LOG.warnf("Travel processing failed: %s", e.getMessage());
+                            }
+                        }, Infrastructure.getDefaultExecutor());
+                    }
+
+                    // Tasteless spawn check (async, non-blocking, after turn completes)
+                    CompletableFuture.runAsync(() -> {
+                        try {
+                            PetProfile pet = petProfileService.getProfile(uid);
+                            if (pet != null && !"EGG".equalsIgnoreCase(pet.getStage().name())) {
+                                tastelessSpawnService.checkSpawn(pet);
+                            }
+                        } catch (Exception e) {
+                            LOG.warnf("Tasteless spawn check failed: %s", e.getMessage());
+                        }
+                    }, Infrastructure.getDefaultExecutor());
                 },
                 // onError: forward to caller
                 error -> {
@@ -285,6 +343,37 @@ public class ConversationProcessService {
         if (pendingQuest != null) {
             String questPrompt = petPromptAssembler.buildQuestPrompt(pendingQuest);
             promptBuilder.append(questPrompt).append("\n");
+        }
+
+        // 1d. Noir quest context (at Bitter Hollow, eligible)
+        try {
+            PetProfile petForNoir = petProfileService.getProfile(userId);
+            if (petForNoir != null && "BITTER_HOLLOW".equals(petForNoir.getCurrentLocation())
+                && noirQuestService.isEligible(userId)) {
+                String noirQuestion = noirQuestService.getNextQuestion(userId);
+                if (noirQuestion != null) {
+                    promptBuilder.append("=== Noir Coneko Quest ===\n");
+                    promptBuilder.append("Noir Coneko đang ở đây. Hãy hỏi bé (trong vai Noir, giọng trầm và bí ẩn): ");
+                    promptBuilder.append(noirQuestion).append("\n");
+                    promptBuilder.append("Sau khi bé trả lời, hãy kết thúc bằng [NOIR_RESPONSE] để đánh dấu câu trả lời cần đánh giá.\n\n");
+                }
+            }
+        } catch (Exception e) {
+            LOG.warnf("Noir quest context failed: %s", e.getMessage());
+        }
+
+        // 1e. Travel context (sub-location flavor + suggestion + marker instruction)
+        try {
+            PetProfile petForTravel = petProfileService.getProfile(userId);
+            if (petForTravel != null) {
+                String travelPrompt = travelPromptBuilder.build(
+                    petForTravel.getCurrentLocation(), topInterests, session);
+                if (!travelPrompt.isBlank()) {
+                    promptBuilder.append(travelPrompt);
+                }
+            }
+        } catch (Exception e) {
+            LOG.warnf("Travel context failed: %s", e.getMessage());
         }
 
         // 2. Kid Mode Context
@@ -429,6 +518,13 @@ public class ConversationProcessService {
                 questEvaluationService.processResult(userId, questResult, quest);
             }
             response = questEvaluationService.stripQuestMarker(response);
+
+            // Travel marker processing
+            String travelCode = travelMarkerParser.parse(response);
+            if (travelCode != null) {
+                travelService.travel(userId, travelCode);
+            }
+            response = travelMarkerParser.strip(response);
 
             // Store in session history
             session.addTurn(request.getMessage(), response);

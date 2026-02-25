@@ -1,12 +1,12 @@
 # AI-MON System Architecture
 
-**Last Updated:** 2026-02-22
-**Version:** v0.2 (Phase 3: Adaptive Interests + Phase 7: Game Loop & SFX + Phase 8: World Lore + Phase 10: Offline Resilience + Phase 11: Combat & Shards)
-**Status:** Tasteless Combat + Memory Shard System Complete
+**Last Updated:** 2026-02-25
+**Version:** v0.2 (Phase 2c: Location Travel + Phase 3: Adaptive Interests + Phase 7: Game Loop & SFX + Phase 8: World Lore + Phase 10: Offline Resilience + Phase 11: Combat & Shards)
+**Status:** Location Travel System + Tasteless Combat + Memory Shard System Complete
 
 ## System Overview
 
-AI-MON is a distributed voice-driven AI companion system for Raspberry Pi with a clean microservices architecture. The refactored backend (`aimon-backend`) coordinates real-time push-to-talk conversations, pet game mechanics, and turn-based combat system. The frontend (`aimon-frontend`) implements interactive pet gameplay: SFX feedback, badge notifications, quest system, evolution/regression/transformation sequences, combat battles, and 4-layer compositor rendering with TTS ducking on a 240x280 LCD display. Phase 7 adds full game loop mechanics; Phase 8 adds camera vision analysis on-device; Phase 10 adds offline resilience with tamagotchi-style gameplay; Phase 11 adds Tasteless Combat encounters and Memory Shard progression with Noir quest arc.
+AI-MON is a distributed voice-driven AI companion system for Raspberry Pi with a clean microservices architecture. The refactored backend (`aimon-backend`) coordinates real-time push-to-talk conversations, pet game mechanics, turn-based combat system, and dynamic location travel within Sweet Dominion. The frontend (`aimon-frontend`) implements interactive pet gameplay: SFX feedback, badge notifications, quest system, evolution/regression/transformation sequences, combat battles, location-based background swapping, and 4-layer compositor rendering with TTS ducking on a 240x280 LCD display. Phase 2c adds sub-location travel with LLM-driven markers; Phase 7 adds full game loop mechanics; Phase 8 adds camera vision analysis on-device; Phase 10 adds offline resilience with tamagotchi-style gameplay; Phase 11 adds Tasteless Combat encounters and Memory Shard progression with Noir quest arc.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -880,6 +880,156 @@ In `ConversationProcessService.buildEnhancedPrompt()`:
 **Data Seeding:**
 - `world_lore_cotton_land_seed.sql`: Pre-populated Cotton Land lore (30+ entries)
 - Categories: geography, characters, items, events, history
+
+---
+
+## Location Travel System (Phase 2c)
+
+**Purpose:** Enable dynamic sub-location travel within Sweet Dominion, driven by LLM-generated travel markers and interest-based suggestions. Players navigate 5 themed locations with distinct visual backgrounds and atmospheric context.
+
+### Architecture
+
+**Sub-Locations (5 within Sweet Dominion):**
+
+| Location | Vietnamese Alias | Background PNG | Interest Tags | Description |
+|----------|------------------|----------------|---------------|-------------|
+| WHIPCREAM_SPIRE | Tháp Kem | whipcream-spire.png | (none) | Home/spawn location, no suggestion target |
+| MARSHMALLOW_MEADOW | Đồng Kẹo Dẻo | marshmallow-meadow.png | động-vật, thiên-nhiên | Soft grasslands with candy rabbits |
+| CANDY_LANTERN_TOWN | Thị Trấn Đèn Kẹo | candy-lantern-town.png | nghệ-thuật, gia-đình | Colorful lantern-lit streets |
+| BISCUIT_HILLS | Đồi Bánh Quy | biscuit-hills.png | nấu-ăn, thể-thao | Fragrant cookie-scented hills |
+| VANILLA_PROMENADE | Đại Lộ Vani | vanilla-promenade.png | âm-nhạc, cổ-tích, sách-truyện | Elegant avenue with gentle melodies |
+
+**Enum: `SubLocation`**
+- Each has display name, Vietnamese alias, background filename, interest tags, parent region
+- `fromCode(code)`: Lookup by enum name
+- `bestMatchForInterests(interests)`: Find location with highest tag overlap
+
+### Travel Flow
+
+**Step 1: Prompt Injection (Layer 1e)**
+```
+ConversationProcessService.buildEnhancedPrompt()
+    ├─ Injects current location flavor text
+    ├─ Suggests travel destination based on top interests
+    ├─ Instructs LLM to emit [TRAVEL:CODE] marker at end of response
+    └─ Provides codex of all available locations
+```
+
+**Step 2: LLM Response with Marker**
+```
+LLM Response: "Chúng mình đi Đồng Kẹo Dẻo để thấy những con thỏ kẹo nhé! [TRAVEL:MARSHMALLOW_MEADOW]"
+```
+
+**Step 3: Marker Parsing & Travel Execution**
+```
+TravelMarkerParser.parse(response)
+    └─ Extract location code: "MARSHMALLOW_MEADOW"
+
+TravelService.travel(userId, "MARSHMALLOW_MEADOW")
+    ├─ Validate code exists
+    ├─ Verify pet in parent region (SWEET_DOMINION)
+    ├─ Update PetProfile.currentLocation
+    └─ Fire LocationChangedEvent
+
+TravelMarkerParser.strip(response)
+    └─ Remove marker for TTS ("Chúng mình đi Đồng Kẹo Dẻo để thấy những con thỏ kẹo nhé!")
+```
+
+**Step 4: WebSocket Update**
+```
+PetEventBridge.onLocationChanged(event)
+    └─ Send to client: { type: "location_changed", location: "MARSHMALLOW_MEADOW", background_file: "marshmallow-meadow.png" }
+
+Frontend ws_client.py receives
+    └─ Dispatches to pet-event-handler.py
+
+pet-event-handler.py processes
+    └─ Calls display_engine.update_background(background_file)
+    └─ LCD renders new background next frame
+```
+
+### Services
+
+**TravelService (~65 LOC):**
+- `travel(userId, subLocationCode)`: Validates code, checks region, updates pet profile
+- Returns false if code invalid or pet not in correct region
+- Fires CDI event on successful travel
+
+**TravelMarkerParser (~30 LOC):**
+- `parse(text)`: Extract `[TRAVEL:XXX]` marker code
+- `strip(text)`: Remove marker (for TTS + history storage)
+- Regex pattern: `\[TRAVEL:([A-Z_]+)\]`
+
+**TravelPromptBuilder (~85 LOC):**
+- `build(currentLocation, topInterests, session)`: Build complete travel context block
+- Includes: current flavor text, interest-based suggestion, marker instruction codex
+- Once-per-session suggestion tracking via `ConversationSession.hasSuggestedTravel()`
+
+### Integration Points
+
+**In ConversationProcessService:**
+1. Inject travel prompt layer via `TravelPromptBuilder.build()`
+2. After LLM response: `String travelCode = travelMarkerParser.parse(response)`
+3. If code found: `travelService.travel(userId, travelCode)`
+4. Strip marker for TTS: `cleanedResponse = travelMarkerParser.strip(response)`
+
+**In PetEventBridge:**
+1. Observe `LocationChangedEvent`
+2. Send `location_changed` WebSocket message with background filename
+3. Update session state if needed
+
+**In ConversationSession:**
+- Track `suggestedTravelLocations` set (once-per-session cap)
+- Methods: `hasSuggestedTravel(code)`, `markTravelSuggested(code)`
+
+### Frontend Integration
+
+**ws_client.py:**
+- Handle `location_changed` messages
+- Extract `background_file` field
+
+**pet-event-handler.py:**
+```python
+def on_location_changed(message):
+    background_file = message.get("background_file")
+    display_engine.update_background(background_file)
+```
+
+**display_engine.py:**
+- Load PNG from `assets/backgrounds/{background_file}`
+- Update background layer in compositor on next frame
+- Smooth transition (no animation for now)
+
+### Configuration & Extensibility
+
+**Prompt Flavor Text (Hardcoded in TravelPromptBuilder):**
+- WHIPCREAM_SPIRE: "những tòa tháp kem khổng lồ lấp lánh"
+- MARSHMALLOW_MEADOW: "cỏ mềm như bông gòn, thỏ kẹo"
+- CANDY_LANTERN_TOWN: "đèn lồng nhiều màu sắc"
+- BISCUIT_HILLS: "mùi bánh quy thơm lừng"
+- VANILLA_PROMENADE: "giai điệu nhẹ nhàng"
+
+**Interest Tag Mapping:**
+- Travel suggestions ranked by overlap with AdaptiveInterestService top 3 interests
+- Each location tagged with 1-3 interest codes (e.g., "động-vật", "thể-thao")
+- Whipcream Spire has no tags (prevents suggestion as travel destination)
+
+**Once-Per-Session Rule:**
+- TravelPromptBuilder checks `session.hasSuggestedTravel(code)`
+- Only suggests each location once per session to avoid repetition
+
+### Future Enhancements
+
+**Phase 2d — Location NPCs:**
+- Add NPC encounters per location
+- Dialog trees triggered on arrival
+
+**Phase 3 — Travel History:**
+- Track visited locations for progression
+- Unlock special conversations based on exploration
+
+**Phase 4 — Fast Travel:**
+- Shortcut teleportation between discovered locations
 
 ---
 
