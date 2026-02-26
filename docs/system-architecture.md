@@ -1,12 +1,12 @@
 # AI-MON System Architecture
 
-**Last Updated:** 2026-02-25
-**Version:** v0.2 (Phase 2c: Location Travel + Phase 3: Adaptive Interests + Phase 7: Game Loop & SFX + Phase 8: World Lore + Phase 10: Offline Resilience + Phase 11: Combat & Shards)
-**Status:** Location Travel System + Tasteless Combat + Memory Shard System Complete
+**Last Updated:** 2026-02-26
+**Version:** v0.2+ (Phase 2c: Location Travel + Phase 3: Adaptive Interests + Phase 7: Game Loop & SFX + Phase 8: World Lore + Phase 10: Offline Resilience + Phase 11: Combat & Shards + Phase 12: Continuous Conversation Mode)
+**Status:** Phase 12 VAD Integration In Progress
 
 ## System Overview
 
-AI-MON is a distributed voice-driven AI companion system for Raspberry Pi with a clean microservices architecture. The refactored backend (`aimon-backend`) coordinates real-time push-to-talk conversations, pet game mechanics, turn-based combat system, and dynamic location travel within Sweet Dominion. The frontend (`aimon-frontend`) implements interactive pet gameplay: SFX feedback, badge notifications, quest system, evolution/regression/transformation sequences, combat battles, location-based background swapping, and 4-layer compositor rendering with TTS ducking on a 240x280 LCD display. Phase 2c adds sub-location travel with LLM-driven markers; Phase 7 adds full game loop mechanics; Phase 8 adds camera vision analysis on-device; Phase 10 adds offline resilience with tamagotchi-style gameplay; Phase 11 adds Tasteless Combat encounters and Memory Shard progression with Noir quest arc.
+AI-MON is a distributed voice-driven AI companion system for Raspberry Pi with a clean microservices architecture. The refactored backend (`aimon-backend`) coordinates real-time voice conversations, pet game mechanics, turn-based combat system, and dynamic location travel within Sweet Dominion. The frontend (`aimon-frontend`) implements interactive pet gameplay: SFX feedback, badge notifications, quest system, evolution/regression/transformation sequences, combat battles, location-based background swapping, and 4-layer compositor rendering with TTS ducking on a 240x280 LCD display. Phase 12 replaces push-to-talk with continuous conversation mode using WebRTC VAD for automatic speech detection and auto-resume after playback.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -22,7 +22,8 @@ AI-MON is a distributed voice-driven AI companion system for Raspberry Pi with a
 │  │ │  3. Character sprite (per-frame blit)             │  │   │
 │  │ │  4. Speech bubble (per-frame)                     │  │   │
 │  │ └─────────────────────────────────────────────────────┘  │   │
-│  │ - Button input (push-to-talk / double-press → camera)   │   │
+│  │ - Button input (single press toggle: continuous mode+VAD) │   │
+│  │   Double-press triggers camera feed detection            │   │
 │  │ - Audio I/O (OPUS/PCM16)                                │   │
 │  │ - Camera: OV5647 CSI → JPEG → Gemini 2.5 Flash (direct)│   │
 │  │   Food detected → pet_feed_confirm → backend applies    │   │
@@ -39,7 +40,8 @@ AI-MON is a distributed voice-driven AI companion system for Raspberry Pi with a
 │  │  │  WebSocket Handler (v4 Protocol)               │      │ │
 │  │  │  - Session management                          │      │ │
 │  │  │  - Audio frame buffering                       │      │ │
-│  │  │  - Push-to-talk state machine                  │      │ │
+│  │  │  - Continuous conversation state machine        │      │ │
+│  │  │  - VAD integration (Phase 12)                  │      │ │
 │  │  │  - Interrupt handling                          │      │ │
 │  │  └────────────────┬────────────────────────────────┘      │ │
 │  │                   │                                        │ │
@@ -199,7 +201,7 @@ class DisplayEngine:
 
 **Hardware:**
 - ST7789 LCD display (240x280)
-- Physical button (push-to-talk; double-press triggers camera)
+- Physical button (single press: toggle continuous conversation mode; double-press: camera feed trigger)
 - Microphone (audio input)
 - Speaker (audio output)
 - OV5647 CSI camera (640x480 JPEG, for food detection)
@@ -216,7 +218,8 @@ class DisplayEngine:
 | `display/layer-compositor.py` | 4-layer (+food sprites) rendering (background, stats, character, speech, food overlay). Dirty-region caching. |
 | `display/badge-popup-renderer.py` | Temporary badge notification overlay (3-second popup with SFX trigger). |
 | `display/food-sprite-manager.py` | Food sprite animation & queue mgmt: FIFO (max 3), tween animation, auto-eat on hunger/timer. Sprite key from Gemini vision. |
-| `audio/audio_capture.py` | Record audio in LISTENING state, send OPUS frames to backend. |
+| `audio/audio_capture.py` | Record audio continuously, VAD integration for speech detection (Phase 12). Send OPUS frames to backend. |
+| `audio/voice-activity-detector.py` | WebRTC VAD engine: detects speech end automatically for continuous mode (Phase 12). |
 | `audio/audio_playback.py` | Play PCM16 audio chunks from TTS, stop on interrupt. |
 | `audio/sfx-manager.py` | SFX mixer: 3 channels (primary, notify, ambient), TTS ducking, OGG pre-loading. |
 | `network/ws_client.py` | WebSocket v4 client: hello → audio_start/frames/stop → asr/llm/tts/pet events (21 msg types). |
@@ -224,7 +227,7 @@ class DisplayEngine:
 | `hardware/vision-analysis-service.py` | Gemini 2.5 Flash vision: JPEG → `{is_food, food_name, description}` JSON. |
 | `storage/turn_logger.py` | Log conversations for debugging & analytics. |
 
-**Protocol:** WebSocket v4 (push-to-talk + pet events)
+**Protocol:** WebSocket v4+ (continuous conversation mode + pet events; Phase 12 VAD integration)
 - Binary OPUS frames (input, 48kHz) / PCM16 chunks (output, 16kHz)
 - JSON control + pet messages (21 message types total)
 - Keepalive (ping/pong)

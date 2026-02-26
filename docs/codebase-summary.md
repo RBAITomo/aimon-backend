@@ -1,11 +1,11 @@
 # AI-MON Codebase Summary
 
-**Last Updated:** 2026-02-25
-**Status:** Phase 2c Complete — Location Travel System + Phase 3: Adaptive Interest System + Power-Save Optimizations
+**Last Updated:** 2026-02-26
+**Status:** Phase 12 In Progress — Continuous Conversation Mode with VAD Integration
 
 ## Overview
 
-AI-MON is a voice-driven AI companion for Raspberry Pi with personality, memory, safety filtering, world lore immersion, dynamic location travel, and on-device camera vision. The refactored `aimon-backend` is a clean, focused Java/Quarkus backend. Phase 2c adds sub-location travel within Sweet Dominion with LLM-driven markers and interest-based suggestions. Phase 7 adds interactive pet game mechanics: SFX feedback, dynamic badges, quest system, pet evolution/regression/transformation, and 4-layer display compositor. Phase 8 adds world lore system: Cotton Land contextual facts injected into conversations based on pet level and child interests.
+AI-MON is a voice-driven AI companion for Raspberry Pi with personality, memory, safety filtering, world lore immersion, dynamic location travel, and on-device camera vision. The refactored `aimon-backend` is a clean, focused Java/Quarkus backend. Phase 12 replaces push-to-talk with continuous conversation mode using WebRTC VAD for automatic speech detection and seamless auto-resume after playback.
 
 **Metrics:**
 - **File Reduction:** 90 → 47 files (48% reduction)
@@ -140,7 +140,7 @@ aimon-frontend/
 ├── main.py                       # Entry point: init HAT, display, state machine
 │
 ├── state/
-│   ├── state_machine.py (443 LOC)   # Main orchestrator: IDLE→LISTENING→ASR→ANSWER→EMOTION, quest/evolution flows
+│   ├── state_machine.py (443+ LOC)   # Main orchestrator: IDLE→LISTENING→ASR→ANSWER→EMOTION, continuous mode toggle + VAD auto-resume (Phase 12)
 │   ├── pet-event-handler.py (~157 LOC) # Pet event callbacks, SFX triggers, badge/quest/evolution mgmt (Phase 7)
 │   └── __init__.py
 │
@@ -157,11 +157,12 @@ aimon-frontend/
 │   └── __init__.py
 │
 ├── audio/
-│   ├── audio_capture.py      # Record OPUS @ 48kHz, push-to-talk
-│   ├── audio_playback.py     # Play PCM16 @ 16kHz, interrupt support
-│   ├── sfx-manager.py        # SFX mixer, channel mgmt, TTS ducking (Phase 7)
-│   ├── sfx/                  # SFX audio files (eat.ogg, level-up.ogg, etc.)
-│   ├── offline/              # Offline TTS fallback audio cache
+│   ├── audio_capture.py           # Record OPUS @ 48kHz, continuous mode with VAD (Phase 12)
+│   ├── audio_playback.py          # Play PCM16 @ 16kHz, interrupt support
+│   ├── voice-activity-detector.py # WebRTC VAD engine for continuous conversation mode (Phase 12)
+│   ├── sfx-manager.py             # SFX mixer, channel mgmt, TTS ducking (Phase 7)
+│   ├── sfx/                       # SFX audio files (eat.ogg, level-up.ogg, etc.)
+│   ├── offline/                   # Offline TTS fallback audio cache
 │   └── __init__.py
 │
 ├── network/
@@ -626,6 +627,14 @@ PCM16 Audio Chunks
 - **UX Features:** Food sprites animate toward pet mouth, auto-eat on hunger rise or timer, max 3 concurrent sprites in queue
 - **Sprite assets:** Kebab-case filenames (apple.png, rice.png, milk-bottle.png) match sprite_key from Gemini
 
+### Phase 12: Continuous Conversation Mode with VAD 🔄 IN PROGRESS
+- **New:** `aimon-frontend/audio/voice-activity-detector.py` (WebRTC VAD engine interface, ~150 LOC)
+- **Modified:** `aimon-frontend/audio/audio_capture.py` — Continuous recording mode with VAD integration
+- **Modified:** `aimon-frontend/state/state_machine.py` — Single-press toggle, continuous listening, auto-resume after playback
+- **VAD Integration:** Automatic speech end detection, configurable sensitivity, fallback timeout (30s max)
+- **UX Features:** Pulsing indicator for active listening, seamless auto-resume after TTS playback
+- **Protocol:** WebSocket v4+ (backward compatible, VAD integration transparent to client)
+
 ### Features Kept
 - PowerMem 3-layer memory ✅
 - TTS circuit breaker (VieNeu → Google) ✅
@@ -640,7 +649,7 @@ PCM16 Audio Chunks
 - RAG/Story system
 - VbeeVoice, VietTTS
 - Check-in flow
-- VAD event system
+- Push-to-talk protocol (replaced by continuous mode + VAD in Phase 12)
 - OPUS output encoding
 - Backend-side vision analysis (removed in Phase 8)
 

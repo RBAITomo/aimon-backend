@@ -1,8 +1,8 @@
 # AI-MON Project Overview & Product Development Requirements
 
-**Last Updated:** 2026-02-22
-**Status:** v0.2+ Production Ready (Phase 11 complete)
-**Project Phase:** 11 of 11 (Tasteless Combat & Memory Shard System) - COMPLETE
+**Last Updated:** 2026-02-26
+**Status:** v0.2+ Production Ready (Phase 12 in progress)
+**Project Phase:** 12 of 12+ (Continuous Conversation Mode with VAD) - IN PROGRESS
 
 ---
 
@@ -23,6 +23,7 @@
 - Seamless Reconnection: Exponential backoff WebSocket reconnect, event sync via backend (Phase 10)
 - Tasteless Combat System: Random turn-based encounters, stat-based power calculations (Phase 11)
 - Memory Shard Progression: Level-gated lore discovery, Noir quest arc (Phase 11)
+- Continuous Conversation Mode with VAD: Single press toggle, WebRTC VAD auto-detects speech end, auto-resume after playback (Phase 12)
 
 **Target Users:**
 - Children ages 5-12 (Vietnamese-speaking)
@@ -609,6 +610,41 @@ PowerMem Tables (Managed by memoryservice)
 ### Phase 11: Tasteless Combat & Memory Shard System ✅ COMPLETE
 
 **Purpose:** Add turn-based combat encounters and progressive lore discovery system with Noir final arc.
+
+---
+
+### Phase 12: Continuous Conversation Mode with VAD 🔄 IN PROGRESS
+
+**Purpose:** Replace push-to-talk with single-press continuous mode using WebRTC VAD for automatic speech detection.
+
+**Feature Overview:**
+- **Single Press Toggle:** One button press starts/stops continuous conversation mode
+- **WebRTC VAD Integration:** Automatic speech activity detection (VAD) identifies speech end without user input
+- **Auto-Resume:** After TTS response playback completes, system automatically resumes listening
+- **Fallback Timeout:** Manual stop available if VAD detection fails (30s max listening window)
+- **User Feedback:** Visual indicator (pulsing animation) shows active listening state
+
+**Technical Implementation:**
+- **New Module:** `aimon-frontend/audio/voice-activity-detector.py` — WebRTC VAD engine interface
+- **Modified:** `aimon-frontend/audio/audio_capture.py` — Continuous capture with VAD integration
+- **Modified:** `aimon-frontend/state/state_machine.py` — Toggle listening state, auto-resume logic
+- **Protocol Change:** WebSocket v4+ (backward compatible with existing client)
+- **VAD Configuration:** Sensitivity thresholds, frame analysis (20ms windows)
+
+**Acceptance Criteria:**
+- ✅ Single press starts continuous listening
+- ✅ VAD detects speech end within 2s
+- ✅ Auto-resume after TTS with zero UI interaction
+- ✅ Fallback timeout at 30s max
+- ✅ Backward compatible with existing clients
+
+**Deliverables:**
+- 1 new Python VAD module (~150 LOC)
+- 2 modified frontend modules (audio_capture, state_machine)
+- Updated WebSocket protocol documentation (v4+)
+- Configuration constants for VAD sensitivity
+
+---
 
 **Combat System:**
 - **TastelessSpawnService:** Random encounter spawning (configurable spawn chance, gated by pet level)
