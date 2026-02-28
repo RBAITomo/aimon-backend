@@ -1,7 +1,8 @@
 # AI-MON Digital Pet Companion — Game Manual
 
 **For:** Vietnamese children ages 5–12 and their parents
-**Last Updated:** 2026-02-17
+**Last Updated:** 2026-02-28
+**Device Version:** Frontend V2 (Landscape Display, 4-Button Controls, Food Inventory, Menu System)
 
 ---
 
@@ -12,8 +13,8 @@
 Mon speaks Vietnamese, remembers your conversations, and changes personality as your bond grows. The more you care for Mon, the more Mon cares about you.
 
 **The device has:**
-- A small 240x280 pixel color screen (Mon's home)
-- One button for voice chat and camera
+- A 280x240 pixel color landscape screen (Mon's home)
+- 5 physical buttons: Main + 4 labeled buttons (A, B, C, D) for different actions
 - A microphone so Mon can hear you
 - A speaker so Mon can talk back
 - A small camera to see what you show it
@@ -23,19 +24,26 @@ Mon speaks Vietnamese, remembers your conversations, and changes personality as 
 
 ## 2. How to Play
 
-### Button Controls
+### Button Controls (V2 Layout)
 
-| Action | What Happens |
-|--------|--------------|
-| Press and hold button | Mon listens to you (LED turns green) |
-| Release button | Mon thinks and responds |
-| Press button while Mon is talking | Stop Mon's response (interrupt) |
-| Double-press button quickly (within 0.5 sec) | Camera activates — show Mon your food! |
+| Button | Action | What Happens |
+|--------|--------|--------------|
+| **A** | Press | Start or stop conversation (Mon listens, LED green) |
+| **B** | Press | Camera activates — show Mon your food! |
+| **C** | Press | Quick-feed — give Mon food from your inventory |
+| **D** | Press | Request a quest from Mon (Mon suggests an adventure) |
+| **Main** | Press | Open menu (see stats, inventory, badges, map) |
+| **Main** | Hold 5 seconds | Shutdown warning screen appears |
+| | Release within 5s | Cancel shutdown |
+| | Press during warning | Confirm shutdown immediately |
 
 **Tips:**
-- Hold the button until you finish your sentence, then let go.
-- You can interrupt Mon at any time by pressing the button once.
-- Double-press means two quick taps — practice a few times to get the timing right.
+- Button A: Press to start, press again when done speaking. Mon will think and respond.
+- Button B: Perfect for showing Mon food like apples, rice, or drinks.
+- Button C: Keep food in your inventory and feed Mon anytime with one quick press.
+- Button D: Ask Mon for a quest once every 5 seconds.
+- Main button menu: Browse Pet Status, Food Inventory, Badges, and Map (use A/D to navigate, B to enter, C to back out).
+- Shutdown: Hold main button 5 seconds to see warning, then press main button again to confirm or button A to cancel.
 
 ### LED Color Guide
 
@@ -65,10 +73,23 @@ Mon has three core stats displayed as bars at the top of the screen. Keep them h
 At the bottom of the screen, there is an **XP bar** showing Mon's progress toward the next level.
 
 **How to improve stats:**
-- Feed Mon (camera + food) → raises Hunger
-- Chat with Mon → raises Happiness
-- Complete quests → raises Happiness, costs a little Energy
+- Feed Mon (camera + food → Button C) → raises Hunger
+- Chat with Mon (Button A) → raises Happiness
+- Complete quests (Button D) → raises Happiness, costs a little Energy
 - Let Mon rest by leaving the device on quietly → recovers Energy over time
+
+### Food Inventory (V2 Feature)
+
+Mon now has a **food pantry** — up to 20 items you've shown the camera! When you use the camera (Button B) to show Mon food, it gets saved in your inventory instead of being eaten right away.
+
+- **Button C:** Quick-feed the oldest food in your inventory to Mon
+- **Menu → Food Inventory:** See all your stored food
+- **Automatic eviction:** When pantry is full (20 items), the oldest food disappears to make room
+
+**Tips:**
+- Use the camera to collect many different foods for Mon
+- Save them up and feed Mon all at once, or spread feeding throughout the day
+- Each food item shows when you collected it
 
 ---
 
@@ -152,12 +173,13 @@ Quests are mini-challenges where Mon asks you a question and waits for your answ
 
 ### How Quests Work
 
-1. During a conversation, Mon might offer a quest: "Do you want to try a challenge?"
-2. A question appears in the speech bubble on screen.
-3. Press and hold the button, then speak your answer.
-4. Mon evaluates your answer using AI — it understands varied responses, not just exact keywords.
-5. If you answer well, Mon responds with praise, and you earn happiness + XP.
-6. Quests are age-appropriate and educational — science, math, language, nature.
+1. Press Button D to request a quest from Mon (once every 5 seconds).
+2. Mon responds with a question displayed in the speech bubble.
+3. Press Button A and hold, then speak your answer clearly.
+4. Release Button A when done speaking.
+5. Mon evaluates your answer using AI — it understands varied responses, not just exact keywords.
+6. If you answer well, Mon responds with praise, and you earn happiness + XP.
+7. Quests are age-appropriate and educational — science, math, language, nature.
 
 **Quest grading is generous** — Mon is a kind teacher. As long as your answer shows understanding, you will be rewarded.
 
@@ -253,11 +275,14 @@ If you ignore three consecutive warnings without improving any stat, **Mon regre
 
 | What to Do | How |
 |------------|-----|
-| Talk to Mon | Press and hold button, speak, release |
-| Feed Mon | Double-press button, show food to camera |
-| Start a quest | Say "I want a challenge" to Mon |
-| Check Mon's stats | Look at bars at top of screen |
-| Stop Mon talking | Press button once |
+| Talk to Mon | Press Button A, speak, release (VAD auto-stops) |
+| Feed Mon | Press Button B, show food to camera, or press Button C from inventory |
+| Start a quest | Press Button D to request a new quest |
+| Check Mon's stats | Press Main button → Pet Status screen (or look at top bars) |
+| Open menu | Press Main button |
+| Close menu | Press Main button or Button C |
+| Interrupt Mon | Press Button A during conversation |
+| Shutdown device | Hold Main button 5 seconds, then press again to confirm |
 
 **Support:** Ask a parent or guardian for help with device setup, WiFi connection, or account management.
 

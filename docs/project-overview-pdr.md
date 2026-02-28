@@ -1,8 +1,8 @@
 # AI-MON Project Overview & Product Development Requirements
 
-**Last Updated:** 2026-02-26
-**Status:** v0.2+ Production Ready (Phase 12 in progress)
-**Project Phase:** 12 of 12+ (Continuous Conversation Mode with VAD) - IN PROGRESS
+**Last Updated:** 2026-02-28
+**Status:** v0.2+ Production Ready (Phase 12 & Frontend V2 Complete)
+**Project Phase:** 12 Complete + Frontend V2 Gameplay Overhaul Complete
 
 ---
 
@@ -12,18 +12,24 @@
 
 **v0.2+ Highlights:**
 - Clean, focused microservices architecture
-- Push-to-talk WebSocket v4 protocol
+- Continuous conversation mode with WebRTC VAD (Phase 12)
 - 3-layer memory system (PowerMem integration)
 - Real-time streaming responses (STT → LLM → TTS)
 - Kid-safe content filtering
 - 48% code reduction from legacy codebase
-- Camera vision: Pi-direct Gemini API food detection (Phase 8)
-- Enhanced Food Feeding UX: On-screen food sprite animations with tween effects (Phase 9)
-- Offline Resilience: Tamagotchi-style gameplay, SQLite event journal, stat decay engine (Phase 10)
-- Seamless Reconnection: Exponential backoff WebSocket reconnect, event sync via backend (Phase 10)
-- Tasteless Combat System: Random turn-based encounters, stat-based power calculations (Phase 11)
-- Memory Shard Progression: Level-gated lore discovery, Noir quest arc (Phase 11)
-- Continuous Conversation Mode with VAD: Single press toggle, WebRTC VAD auto-detects speech end, auto-resume after playback (Phase 12)
+- Camera vision: Backend-routed Moondream2 sidecar + GPT-4o-mini fallback
+- Enhanced Food Feeding UX: On-screen food sprite animations (Phase 9)
+- Offline Resilience: Tamagotchi-style gameplay, SQLite event journal, stat decay
+- Seamless Reconnection: Exponential backoff, event sync via backend
+- Tasteless Combat System: Turn-based encounters, stat-based power
+- Memory Shard Progression: Level-gated lore discovery, Noir quests
+- **Frontend V2 Gameplay Overhaul:**
+  - Landscape display: 280x240 (MADCTL 0x60, X-axis offset)
+  - 4-button controls: A=talk, B=camera, C=quick-feed, D=quest
+  - Main button: Press=menu, Hold 5s=shutdown (with warning & confirm)
+  - Persistent food inventory: JSON storage, FIFO max 20 items, auto-evict
+  - Interactive menu overlay: 4 screens (Pet Status, Food Inventory, Badges, Map)
+  - Navigation: A=next, D=prev, B=enter, C=back, Main=close
 
 **Target Users:**
 - Children ages 5-12 (Vietnamese-speaking)
@@ -497,19 +503,24 @@ PowerMem Tables (Managed by memoryservice)
 
 ---
 
-### Phase 8: Camera Vision Direct Refactor ✅ COMPLETE
-- Vision analysis moved from backend (LiteLLM proxy) to Pi-direct Gemini API
-- `aimon-frontend/hardware/vision-analysis-service.py` — google-genai SDK, Gemini 2.5 Flash
-- `aimon-frontend/hardware/camera-capture-service.py` — picamera2, OV5647 CSI camera
-- Removed from backend: `VisionAnalysisClient.java`, `VisionAnalysisResult.java`, `VisionConfig`
-- Feed flow: Pi detects food → `pet_feed_confirm{food_name}` → backend applies hunger update
-- WS frame size restored to 64KB (no base64 image data over WebSocket)
-- New Pi env vars: `GEMINI_API_KEY`, `GEMINI_MODEL`
+### Phase 8: Camera Vision Direct Refactor → Phase 13: Backend-Routed Vision Sidecar ✅ COMPLETE
+- **Phase 8:** Vision analysis moved from backend (LiteLLM proxy) to Pi-direct Gemini API (15-60s latency)
+- **Phase 13:** Vision analysis re-routed to backend via new Moondream2 FastAPI sidecar (<0.5s latency) + GPT-4o-mini cloud fallback
+- **New:** `VisionService.java` (222 LOC) — Orchestrates sidecar → cloud fallback with multipart JPEG upload
+- **New:** `VisionResource.java` (50 LOC) — POST `/api/vision/analyze` endpoint, validates MIME type & 5MB size limit
+- **New:** `FoodVisionResult.java` record — Unified vision result DTO with `is_food`, `food_name`, `sprite_key`, `description`, `inference_ms`, `source`
+- **New:** `vision-sidecar/` — Moondream2 FastAPI service on port 8090, 2s timeout (falls back to cloud)
+- **Frontend change:** JPEG now sent to backend `/api/vision/analyze` instead of Pi-side Gemini call
+- **Config:** Removed `GEMINI_API_KEY` from frontend; added `BACKEND_HTTP_URL` for backend routing
+- **Docker:** vision-sidecar added to docker-compose.yml with GPU acceleration
+- **LiteLLM config:** gpt-4o-mini added as fallback model in LiteLLM for cloud vision
 
 **Deliverables:**
-- Lean backend (no vision code)
-- Pi-side vision pipeline (camera → Gemini → feed confirm)
-- 64KB WS frame limit maintained
+- <0.5s sidecar vision inference (vs 15-60s Pi-direct Gemini)
+- Deterministic 2s timeout with cloud fallback
+- Sprite key matching for 150+ food items
+- Centralized vision error handling
+- 64KB WebSocket frame limit maintained (JPEG sent via multipart HTTP)
 
 ### Phase 9: Enhanced Food Feeding UX ✅ COMPLETE
 - VisionAnalysisService now returns `sprite_key` (food sprite filename) alongside food detection JSON

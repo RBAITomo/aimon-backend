@@ -1,12 +1,12 @@
 # AI-MON System Architecture
 
-**Last Updated:** 2026-02-26
-**Version:** v0.2+ (Phase 2c: Location Travel + Phase 3: Adaptive Interests + Phase 7: Game Loop & SFX + Phase 8: World Lore + Phase 10: Offline Resilience + Phase 11: Combat & Shards + Phase 12: Continuous Conversation Mode)
-**Status:** Phase 12 VAD Integration In Progress
+**Last Updated:** 2026-02-28
+**Version:** v0.2+ (Phase 12: Continuous Conversation + Phase 13: Backend Vision Sidecar + Frontend V2: Gameplay Overhaul)
+**Status:** Frontend V2 Complete (Landscape Display, 4-Button Controls, Food Inventory, Menu System)
 
 ## System Overview
 
-AI-MON is a distributed voice-driven AI companion system for Raspberry Pi with a clean microservices architecture. The refactored backend (`aimon-backend`) coordinates real-time voice conversations, pet game mechanics, turn-based combat system, and dynamic location travel within Sweet Dominion. The frontend (`aimon-frontend`) implements interactive pet gameplay: SFX feedback, badge notifications, quest system, evolution/regression/transformation sequences, combat battles, location-based background swapping, and 4-layer compositor rendering with TTS ducking on a 240x280 LCD display. Phase 12 replaces push-to-talk with continuous conversation mode using WebRTC VAD for automatic speech detection and auto-resume after playback.
+AI-MON is a distributed voice-driven AI companion system for Raspberry Pi with a clean microservices architecture. The refactored backend (`aimon-backend`) coordinates real-time voice conversations, pet game mechanics, turn-based combat, dynamic location travel, and food vision analysis via Moondream2 sidecar. The frontend (`aimon-frontend` V2) implements interactive pet gameplay: landscape display (280x240), 4-button controls (A=talk, B=camera, C=quick-feed, D=quest), persistent food inventory (JSON, FIFO max 20), menu overlay system (Pet Status/Food Inventory/Badges/Map screens), SFX feedback, badge notifications, quest system, evolution/regression/transformation sequences, combat battles, location-based background swapping, and 5-layer compositor rendering with TTS ducking. Phase 12 integrated continuous conversation mode with WebRTC VAD. Phase 13 routed camera vision to backend Moondream2 sidecar (<0.5s latency). Frontend V2 adds landscape rotation, button remapping, food inventory persistence, and interactive menu system.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -16,17 +16,18 @@ AI-MON is a distributed voice-driven AI companion system for Raspberry Pi with a
 │  ┌──────────────────────────────────────────────────────────┐   │
 │  │ Client (Pi Zero) — aimon-frontend                        │   │
 │  │ ┌─────────────────────────────────────────────────────┐  │   │
-│  │ │ Display: 4-Layer Compositor (240x280 LCD ST7789)  │  │   │
-│  │ │  1. Background (cached)                           │  │   │
-│  │ │  2. Status bars (cached until dirty)              │  │   │
-│  │ │  3. Character sprite (per-frame blit)             │  │   │
-│  │ │  4. Speech bubble (per-frame)                     │  │   │
-│  │ └─────────────────────────────────────────────────────┘  │   │
-│  │ - Button input (single press toggle: continuous mode+VAD) │   │
-│  │   Double-press triggers camera feed detection            │   │
+│  │ │ Display: 5-Layer Compositor (280x240 LCD ST7789 landscape)  │  │
+│  │ │  1. Background (cached)                                    │  │
+│  │ │  2. Status bars (cached until dirty)                       │  │
+│  │ │  3. Character sprite (per-frame blit)                      │  │
+│  │ │  4. Speech bubble (per-frame)                              │  │
+│  │ │  5. Menu overlay (when active)                             │  │
+│  │ └─────────────────────────────────────────────────────────────┘  │
+│  │ - 5-Button input (A=talk, B=camera, C=quick-feed, D=quest, Main=menu/shutdown) │
+│  │   Continuous conversation with VAD auto-stop                      │
 │  │ - Audio I/O (OPUS/PCM16)                                │   │
-│  │ - Camera: OV5647 CSI → JPEG → Gemini 2.5 Flash (direct)│   │
-│  │   Food detected → pet_feed_confirm → backend applies    │   │
+│  │ - Camera: OV5647 CSI → JPEG → HTTP to backend       │   │
+│  │   Backend vision sidecar (Moondream2) → pet_feed_confirm│   │
 │  └──────────────────────────────────────────────────────────┘   │
 │           │                                                 │   │
 │           │                                                 │   │
@@ -106,11 +107,20 @@ AI-MON is a distributed voice-driven AI companion system for Raspberry Pi with a
 │  └─────────────┘  └─────────────┘  └──────────────┘  └───────────┘
 │                                                                  │
 │  ┌─────────────────────────────────────────────────────────┐    │
-│  │ Gemini API (google.generativeai.com) — Pi-direct only   │    │
-│  │  - Called by VisionAnalysisService on Pi (google-genai) │    │
-│  │  - Model: gemini-2.5-flash                              │    │
-│  │  - Input: JPEG bytes from OV5647 camera                 │    │
-│  │  - Output: JSON { is_food, food_name, description }     │    │
+│  │ Vision Services (Phase 13 Backend-Routed)              │    │
+│  │  ┌─────────────────────────────────────────────────┐    │    │
+│  │  │ Vision Sidecar (Moondream2 FastAPI, port 8090) │    │    │
+│  │  │  - Model: moondream2 (2s timeout)               │    │    │
+│  │  │  - Input: JPEG via multipart from backend       │    │    │
+│  │  │  - Output: JSON {is_food,food_name,sprite_key}  │    │    │
+│  │  └─────────────────────────────────────────────────┘    │    │
+│  │  ┌─────────────────────────────────────────────────┐    │    │
+│  │  │ Cloud Fallback (gpt-4o-mini via LiteLLM)        │    │    │
+│  │  │  - Model: gpt-4o-mini (10s timeout)             │    │    │
+│  │  │  - Used when sidecar times out                  │    │    │
+│  │  │  - Input: base64 JPEG + prompt                  │    │    │
+│  │  │  - Output: JSON {is_food,food_name,sprite_key}  │    │    │
+│  │  └─────────────────────────────────────────────────┘    │    │
 │  └─────────────────────────────────────────────────────────┘    │
 │                                                                  │
 └─────────────────────────────────────────────────────────────────┘
@@ -148,7 +158,7 @@ AI-MON is a distributed voice-driven AI companion system for Raspberry Pi with a
       ├─ Up to 3 on-screen food sprites (FIFO queue)
       ├─ Tween animation (easing: ease-in-out)
       ├─ Auto-eat when collision/timer triggers
-      └─ Sprite key matched to food sprite filenames via Gemini vision
+      └─ Sprite key matched to food sprite filenames via backend vision service
 ```
 
 **Key Components:**
@@ -202,11 +212,28 @@ class DisplayEngine:
 **Hardware:**
 - ST7789 LCD display (240x280)
 - Physical button (single press: toggle continuous conversation mode; double-press: camera feed trigger)
+- 4 extra buttons A-D (placeholder, no function assigned yet)
 - Microphone (audio input)
 - Speaker (audio output)
 - OV5647 CSI camera (640x480 JPEG, for food detection)
 - WiFi connectivity
 - SPI bus for LCD
+
+**GPIO Pin Assignments (BOARD numbering):**
+
+| Pin | Function |
+|-----|----------|
+| 11 | Main button |
+| 29 | Extra button A (placeholder) |
+| 31 | Extra button B (placeholder) |
+| 32 | Extra button C (placeholder) |
+| 33 | Extra button D (placeholder) |
+| 13 | LCD DC |
+| 7 | LCD RST |
+| 15 | LCD Backlight |
+| 22 | LED Red |
+| 18 | LED Green |
+| 16 | LED Blue |
 
 **Software Modules:**
 
@@ -546,29 +573,50 @@ After TTS ends: SfxManager.unduck() restores 100% volume.
 
 ---
 
-## Camera Vision Feed Flow (Phase 8)
+## Camera Vision Feed Flow (Phase 8 → Phase 13)
 
-Vision analysis runs entirely on the Pi — no camera data traverses the WebSocket.
+**Evolution:** Phase 8 moved vision from backend → Pi (15-60s latency). Phase 13 re-routes vision to backend via Moondream2 sidecar (<0.5s latency).
 
-### Double-Press to Feed
+### Double-Press to Feed (Phase 13 Architecture)
 ```
 [Button double-press detected (within 500ms)]
     ↓
 CameraCaptureService.capture_bytes()     ← picamera2, OV5647 CSI, 640x480 JPEG
     ↓
-VisionAnalysisService.analyze(jpeg_bytes) ← google-genai SDK, Gemini 2.5 Flash
-    │
-    ├─ is_food=true:
-    │   food_name = "bún bò"              ← Vietnamese name returned by Gemini
-    │   Display bubble: "bún bò ngon quá! Cho mình ăn nhé?"
-    │   ws_client.send_feed_confirm(food_name)
-    │       → WS msg: { type: "pet_feed_confirm", food_name: "bún bò" }
-    │
-    └─ is_food=false:
-        Display bubble: <child-friendly description>
-        (no WS message sent)
+ws_client.send_vision_request(jpeg_bytes) → Multipart POST /api/vision/analyze
+    ├─ HTTP routing via BACKEND_HTTP_URL (e.g., http://backend:8080)
+    ├─ Content-Type: multipart/form-data
+    └─ JPEG sent as form field "image"
 
-[Backend receives pet_feed_confirm]
+[Backend VisionResource receives POST]
+    ↓
+VisionService.analyzeFood(jpegBytes)
+    ├─ Try: sidecar classification (2s timeout)
+    │   ├─ POST http://vision-sidecar:8090/classify (multipart)
+    │   ├─ Moondream2 FastAPI responds JSON: {is_food, food_name, sprite_key, description}
+    │   ├─ Inference: <0.5s
+    │   └─ Return FoodVisionResult with source="moondream2"
+    │
+    └─ Fallback: cloud classification via LiteLLM (10s timeout)
+        ├─ POST http://litellm:4000/v1/chat/completions
+        ├─ Model: gpt-4o-mini with vision capability
+        ├─ Inference: 5-10s
+        └─ Return FoodVisionResult with source="gpt-4o-mini"
+
+[Backend returns FoodVisionResult to frontend]
+    ↓
+ws_client receives: { is_food, food_name, sprite_key, description, inference_ms, source }
+    │
+    ├─ if is_food=true:
+    │   ├─ Display bubble: "bún bò ngon quá! Cho mình ăn nhé?"
+    │   ├─ Send WS msg: { type: "pet_feed_confirm", food_name, sprite_key }
+    │   └─ FoodSpriteManager queues sprite animation
+    │
+    └─ if is_food=false:
+        ├─ Display bubble: <child-friendly description>
+        └─ (no pet feed event sent)
+
+[Backend receives pet_feed_confirm via WebSocket]
     ↓
 PetMessageHandler.handleFeedConfirm()
     ├─ hungerReduction = 25 (base)
@@ -580,39 +628,82 @@ PetMessageHandler.handleFeedConfirm()
 state_machine._on_pet_feed_result()      ← updates local pet stats display
 ```
 
-### Key Design Decisions
-- **No base64 over WS:** JPEG bytes never cross the WebSocket; frame limit stays at 64KB.
-- **Pi-direct Gemini call:** Reduces backend complexity; eliminates `VisionAnalysisClient`, `VisionAnalysisResult`, `VisionConfig` from backend.
-- **Rate limiting:** Both camera (30s) and vision service enforce separate rate limits to prevent API abuse.
-- **Env vars on Pi only:** `GEMINI_API_KEY` and `GEMINI_MODEL` are Pi-side env vars (not in backend `.env`).
+### Key Design Decisions (Phase 13)
+- **Backend-routed vision:** Centralizes vision API management; improves latency from 15-60s → <0.5s (sidecar) or 5-10s (cloud fallback).
+- **Moondream2 sidecar:** Lightweight, fast local model; 2s timeout triggers cloud fallback seamlessly.
+- **GPT-4o-mini fallback:** Reliable cloud model via LiteLLM; 10s timeout prevents hangs.
+- **No base64 over WS:** JPEG sent via HTTP multipart to backend; WebSocket only carries results (64KB frame limit maintained).
+- **Rate limiting:** Camera (30s) + sidecar classification (unlimited local) + cloud API fallback (LiteLLM rate limiting).
+- **Config centralized:** `BACKEND_HTTP_URL` on frontend; vision URLs + timeouts configured in backend `application.properties`.
+- **Docker GPU:** vision-sidecar has GPU reservation in docker-compose.yml for hardware acceleration.
 
-### Gemini Vision Request Format
-```python
-# Prompt returns JSON only (no markdown fences)
+### Vision Request/Response Format (Phase 13)
+
+**HTTP Request (Frontend → Backend):**
+```
+POST /api/vision/analyze
+Content-Type: multipart/form-data; boundary=...
+
+--boundary
+Content-Disposition: form-data; name="image"; filename="photo.jpg"
+Content-Type: image/jpeg
+
+<JPEG bytes>
+--boundary--
+```
+
+**HTTP Response (Backend → Frontend):**
+```json
 {
   "is_food": true,
-  "food_name": "<Vietnamese name>",
-  "description": "<brief, child-appropriate>",
-  "sprite_key": "<matching-food-sprite-filename>"   # Phase 9: Added for UX enhancement
+  "food_name": "bún bò",
+  "sprite_key": "apple",
+  "description": "Một tô bún bò nóng hổi ngon tuyệt vời!",
+  "inference_ms": 420,
+  "source": "moondream2"
 }
 ```
 
-### Food Sprite Manager (Phase 9 Enhancement)
+**Sidecar Request Format (Backend → Sidecar):**
+```
+POST http://vision-sidecar:8090/classify
+Content-Type: multipart/form-data
 
-**VisionAnalysisService Extension:**
-- Gemini now returns `sprite_key` matching food sprite filenames (e.g., "apple", "rice", "milk_bottle")
-- Enables visual food sprite animation overlay on pet display
+<same JPEG multipart as above>
+```
+
+**Sidecar Response Format:**
+```json
+{
+  "is_food": true,
+  "food_name": "bún bò",
+  "sprite_key": "apple",
+  "description": "Tô bún bò nóng hổi"
+}
+```
+
+### Food Sprite Manager (Phase 9 Enhancement, integrated Phase 13)
+
+**Vision Response Extension:**
+- VisionService returns `sprite_key` matching 150+ food sprite filenames (e.g., "apple", "rice", "milk_bottle")
+- Sprite key validation: Case-insensitive matching against hardcoded set in `VisionService.SPRITE_KEYS`
+- If unrecognized, defaults to "default" sprite
 
 **FoodSpriteManager Workflow:**
 ```
-[Backend sends pet_feed_confirm with sprite_key]
-    ↓
+[Frontend receives vision classification HTTP response]
+    ├─ Extract sprite_key from FoodVisionResult
+    ├─ Send WS: { type: "pet_feed_confirm", food_name, sprite_key }
+    │
+[Backend receives pet_feed_confirm via WebSocket]
+    └─ Routes to PetMessageHandler → PetProfileService.applyFeed()
+
 [Frontend: PetEventHandler.on_pet_feed_confirm()]
-    ├─ Extract sprite_key from message
+    ├─ Extract sprite_key from WS message
     ├─ FoodSpriteManager.queue_food(sprite_key)
     │   ├─ Add to FIFO queue (max 3 sprites)
     │   ├─ Schedule tween animation (start position → mouth)
-    │   └─ Set auto-eat timer
+    │   └─ Set auto-eat timer (5s)
     │
     ├─ Display renders food sprite with per-frame tween
     │   ├─ Position updates based on easing curve (ease-in-out)
@@ -628,8 +719,9 @@ state_machine._on_pet_feed_result()      ← updates local pet stats display
 **Sprite Assets:**
 - Located: `aimon-frontend/assets/food/`
 - Format: PNG (32x32 or 48x48)
-- Filename convention: kebab-case (matches `sprite_key` from Gemini)
-- Examples: `apple.png`, `rice.png`, `milk-bottle.png`
+- Filename convention: kebab-case (matches `sprite_key` from backend vision service)
+- Examples: `apple.png`, `rice.png`, `milk-bottle.png`, `sushi.png`
+- Validation: Backend VisionService validates against 150+ hardcoded sprite keys
 
 **Display Integration:**
 - Layer 5 (new): Food sprites rendered after character (Layer 3) but before/with speech bubble (Layer 4)
@@ -1120,7 +1212,8 @@ AimonWebSocket
 | **PowerMem** | backend | `http://memoryservice:8003` | 10s | 1 | Continue w/o memory |
 | **VieNeu TTS** | backend | `http://vieneu-tts:5001` | 15s | 1 | Fallback to Google |
 | **Google TTS** | backend | `texttospeech.googleapis.com` | 15s | 1 | Error response |
-| **Gemini Vision** | **Pi (frontend)** | `generativelanguage.googleapis.com` | SDK default | 0 | Return None (no feed) |
+| **Vision Sidecar** | backend | `http://vision-sidecar:8090/classify` | 2s | 0 | Cloud fallback (LiteLLM) |
+| **Vision Cloud** | backend | `http://litellm:4000/v1/chat/completions` (gpt-4o-mini) | 10s | 1 | Error response (no feed) |
 
 ---
 
@@ -1191,7 +1284,8 @@ Services:
   2. memoryservice      (memory MCP)
   3. litellm:main       (LLM proxy)
   4. vieneu-tts:gpu     (GPU TTS)
-  5. aimon-backend      (main backend)
+  5. vision-sidecar     (Moondream2 FastAPI, GPU accelerated)
+  6. aimon-backend      (main backend)
 
 Networks:
   - aimon-network       (internal communication)

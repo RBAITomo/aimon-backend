@@ -1,11 +1,11 @@
 # AI-MON Codebase Summary
 
-**Last Updated:** 2026-02-26
-**Status:** Phase 12 In Progress — Continuous Conversation Mode with VAD Integration
+**Last Updated:** 2026-02-28
+**Status:** Phase 12 Complete + Frontend V2 Gameplay Overhaul (Landscape, Menu, Food Inventory)
 
 ## Overview
 
-AI-MON is a voice-driven AI companion for Raspberry Pi with personality, memory, safety filtering, world lore immersion, dynamic location travel, and on-device camera vision. The refactored `aimon-backend` is a clean, focused Java/Quarkus backend. Phase 12 replaces push-to-talk with continuous conversation mode using WebRTC VAD for automatic speech detection and seamless auto-resume after playback.
+AI-MON is a voice-driven AI companion for Raspberry Pi with personality, memory, safety filtering, world lore immersion, dynamic location travel, and on-device camera vision. The refactored `aimon-backend` is a clean, focused Java/Quarkus backend. Phase 12 introduced continuous conversation mode with WebRTC VAD. Frontend V2 adds landscape display rotation (280x240), 4-button gameplay (A=talk, B=camera, C=quick-feed, D=quest), food inventory persistence (JSON, FIFO max 20), and menu overlay system with 4 screens (Pet Status, Food Inventory, Badges, Map).
 
 **Metrics:**
 - **File Reduction:** 90 → 47 files (48% reduction)
@@ -47,11 +47,13 @@ src/main/java/dev/aimon/
 │   ├── ApplicationConfig  # Quarkus beans
 │   └── DevPropertiesFile  # Dev environment
 │
-├── dto/                   # Data transfer objects (6 subpackages)
+├── dto/                   # Data transfer objects (7 subpackages)
 │   ├── ai/                # LiteLLM messages, requests, responses
 │   ├── conversation/      # Session DTOs
 │   ├── powermem/          # Memory service DTOs
 │   ├── tts/               # TTS request/response objects
+│   ├── vision/            # Vision analysis DTO (Phase 13)
+│   │   └── FoodVisionResult
 │   ├── websocket/         # Protocol messages
 │   └── world/             # World DTOs (LocationDto)
 │
@@ -103,6 +105,9 @@ src/main/java/dev/aimon/
 │   ├── interest/          # Adaptive interest system (Phase 3)
 │   │   └── AdaptiveInterestService (~100 LOC) # Derives top interests from timeline
 │   │
+│   ├── vision/            # Food vision analysis (Phase 13)
+│   │   └── VisionService (222 LOC)       # Moondream2 sidecar + GPT-4o-mini cloud fallback
+│   │
 │   └── world/             # World lore + travel system (Phase 8, 2c)
 │       ├── WorldLoreService (~75 LOC)     # Fetches & ranks lore
 │       ├── TravelService (~65 LOC)        # Sub-location travel validation & execution
@@ -114,6 +119,9 @@ src/main/java/dev/aimon/
 │
 ├── repository/            # Data access layer
 │   └── WorldLoreRepository            # Query world_lore table
+│
+├── rest/                  # REST API endpoints (Phase 13)
+│   └── VisionResource (50 LOC)       # POST /api/vision/analyze for food classification
 │
 └── websocket/             # WebSocket v4 protocol handler
     └── AimonWebSocket (277 LOC)  # Push-to-talk endpoint
@@ -133,62 +141,73 @@ src/test/java/dev/aimon/
 
 ### aimon-frontend Structure
 
-**6 Core Packages + main.py:**
+**9 Core Packages + main.py (Frontend V2: Landscape 280x240, Menu Overlay, Button Remapping):**
 
 ```
 aimon-frontend/
 ├── main.py                       # Entry point: init HAT, display, state machine
 │
 ├── state/
-│   ├── state_machine.py (443+ LOC)   # Main orchestrator: IDLE→LISTENING→ASR→ANSWER→EMOTION, continuous mode toggle + VAD auto-resume (Phase 12)
-│   ├── pet-event-handler.py (~157 LOC) # Pet event callbacks, SFX triggers, badge/quest/evolution mgmt (Phase 7)
+│   ├── state_machine.py (500+ LOC)      # Orchestrator: IDLE→LISTENING→ASR→ANSWER→EMOTION + menu + quest
+│   ├── pet-event-handler.py (~157 LOC)  # Pet event callbacks, SFX, badge/quest/evolution (Phase 7)
+│   ├── food-inventory-manager.py (~80 LOC) # Persistent JSON inventory, FIFO max 20 items (V2)
+│   ├── menu-overlay-controller.py (~120 LOC) # Menu state machine, navigation (V2)
 │   └── __init__.py
 │
-├── display/                      # 4-layer (+food sprites) compositor UI rendering
-│   ├── display_engine.py (117 LOC)      # Pygame wrapper, LCD output via SPI, food sprite rendering
-│   ├── layer-compositor.py (155 LOC)    # 4-layer (+food sprites) compositor with dirty-region caching
+├── display/                      # 5-layer compositor (+ menu overlay layer)
+│   ├── display_engine.py (140 LOC)      # Pygame wrapper, LCD output via SPI, menu layer
+│   ├── layer-compositor.py (180 LOC)    # 5-layer (+menu) compositor with dirty-region caching
+│   ├── menu-overlay-renderer.py (~150 LOC) # Menu carousel & screen rendering (V2)
+│   ├── pet-status-screen-renderer.py (~100 LOC) # Pet stats screen (V2)
+│   ├── inventory-screen-renderer.py (~100 LOC) # Food inventory list (V2)
+│   ├── badges-screen-renderer.py (~60 LOC) # Badge collection (V2)
+│   ├── map-screen-renderer.py (~60 LOC)  # World map (V2)
 │   ├── pet-state-model.py (24 LOC)      # PetState dataclass
 │   ├── sprite-sheet-manager.py (150+ LOC) # Frame loader, stage lifecycle
-│   ├── stat-bar-renderer.py (140+ LOC)  # Hunger/energy/happiness/XP bars
+│   ├── stat-bar-renderer.py (140+ LOC)  # Stat bars (Hunger/Energy/Happiness/XP)
 │   ├── speech-bubble-renderer.py (100+ LOC) # Auto-scrolling text overlay
-│   ├── badge-popup-renderer.py (~62 LOC) # Badge notification overlay (Phase 7)
-│   ├── food-sprite-manager.py (120+ LOC) # Food sprite animation, FIFO queue, auto-eat (Phase 9)
+│   ├── badge-popup-renderer.py (~62 LOC) # Badge notification (Phase 7)
+│   ├── food-sprite-manager.py (120+ LOC) # Food sprite animation (Phase 9)
 │   ├── sprite_manager.py (legacy fallback)
 │   └── __init__.py
 │
 ├── audio/
-│   ├── audio_capture.py           # Record OPUS @ 48kHz, continuous mode with VAD (Phase 12)
+│   ├── audio_capture.py           # Record OPUS @ 48kHz, continuous + VAD (Phase 12)
 │   ├── audio_playback.py          # Play PCM16 @ 16kHz, interrupt support
-│   ├── voice-activity-detector.py # WebRTC VAD engine for continuous conversation mode (Phase 12)
-│   ├── sfx-manager.py             # SFX mixer, channel mgmt, TTS ducking (Phase 7)
-│   ├── sfx/                       # SFX audio files (eat.ogg, level-up.ogg, etc.)
-│   ├── offline/                   # Offline TTS fallback audio cache
+│   ├── voice-activity-detector.py # WebRTC VAD for continuous mode (Phase 12)
+│   ├── sfx-manager.py             # SFX mixer, 3 channels, TTS ducking (Phase 7)
+│   ├── sfx/                       # SFX assets (eat, level-up, badge, etc.)
+│   ├── offline/                   # Offline TTS fallback cache
 │   └── __init__.py
 │
 ├── network/
-│   ├── ws_client.py          # WebSocket v4 client: hello/audio_start/frames/stop
+│   ├── ws_client.py          # WebSocket v4: audio/pet messages + quest_trigger (V2)
 │   └── __init__.py
 │
 ├── hardware/
-│   ├── whisplay_hat.py              # ST7789 LCD driver (SPI), button/LED GPIO
-│   ├── camera-capture-service.py   # OV5647 CSI → JPEG bytes (picamera2, no disk I/O)
-│   ├── vision-analysis-service.py  # JPEG → Gemini 2.5 Flash → food JSON (google-genai)
+│   ├── whisplay_hat.py              # ST7789 LCD driver: MADCTL 0x60 landscape, button/LED (V2)
+│   ├── camera-capture-service.py   # OV5647 CSI → JPEG bytes
+│   ├── vision-analysis-service.py  # JPEG → Gemini 2.5 Flash → food JSON
 │   └── __init__.py
 │
 ├── storage/
 │   ├── turn_logger.py        # Log conversations for debugging
 │   └── __init__.py
 │
-├── config.py                 # Display constants (LCD_WIDTH, ASSET_DIR, STAGE_ASSET_MAP)
+├── config.py                 # Constants: LCD_WIDTH=280, LCD_HEIGHT=240 (V2), menu, inventory, shutdown, quest
+├── data/                     # Data directory for food-inventory.json (V2)
 └── tests/                    # Unit tests (audio, config, state, ws, turn_logger)
 ```
 
 **Key Metrics:**
-- 10 modules + handlers + vision hardware, ~1,700 LOC (Python)
-- Compositor reduces display updates: 2-3 blits/frame vs. fullscreen redraws
-- SFX: 3 reserved channels (primary, notify, ambient) with TTS ducking
-- Badge/quest/evolution animations driven by WebSocket events
-- Target: 30 FPS on Pi Zero 2; adaptive to 10 FPS during idle (Phase 3 power-save)
+- 13 modules + handlers + vision hardware, ~2,000 LOC (Python)
+- 5-layer compositor (+ menu overlay) with dirty-region caching: 2-3 blits/frame
+- SFX: 3 reserved channels with TTS ducking
+- Food inventory: JSON persistence, FIFO max 20, auto-evict oldest
+- Button mapping: A=talk, B=camera, C=quick-feed, D=quest, Main=menu/shutdown
+- Menu navigation: 4 screens (Pet Status, Food Inventory, Badges, Map)
+- Landscape display: 280x240 (MADCTL 0x60), offset on X-axis
+- Target: 30 FPS on Pi Zero 2; adaptive idle fps
 - Vision: Gemini 2.5 Flash called directly from Pi (no data sent over WS)
 - **Power optimization:** Camera power-gating (-150–250 mA), adaptive FPS (-20–40 mA), backlight auto-dim (-0.1–0.3W)
 
@@ -605,15 +624,18 @@ PCM16 Audio Chunks
 - **SFX effects:** eat, level-up, evolution, badge, quest, transform, warning, regression
 - **Animation flows:** Quest display, evolution/regression sequences, warning flash, transform overlay
 
-### Phase 8: Camera Vision Direct Refactor ✅
-- **Moved** vision analysis from backend (LiteLLM proxy) → Pi-direct Gemini API
-- **New:** `aimon-frontend/hardware/vision-analysis-service.py` (google-genai SDK)
-- **New:** `aimon-frontend/hardware/camera-capture-service.py` (picamera2, OV5647)
-- **Removed from backend:** `VisionAnalysisClient.java`, `VisionAnalysisResult.java`, `VisionConfig`
-- **Backend no longer handles:** `camera_photo` WS messages or vision API calls
-- **Feed flow:** Pi double-press → JPEG → Gemini → `pet_feed_confirm{food_name}` → backend applies hunger update
-- **WS frame size:** Restored to 64KB (no base64 photos over WebSocket)
-- **New Pi env vars:** `GEMINI_API_KEY`, `GEMINI_MODEL`
+### Phase 8: Camera Vision Direct Refactor → Phase 13: Backend-Routed Vision Sidecar ✅
+- **Phase 8:** Vision moved from backend → Pi-direct Gemini API (15-60s latency, bandwidth intensive)
+- **Phase 13:** Vision re-routed to backend via Moondream2 FastAPI sidecar (<0.5s latency, deterministic)
+- **New:** `dev.aimon.service.vision.VisionService` (222 LOC) — Sidecar orchestration + cloud fallback
+- **New:** `dev.aimon.rest.VisionResource` (50 LOC) — POST `/api/vision/analyze` endpoint
+- **New:** `dev.aimon.dto.vision.FoodVisionResult` — Vision result DTO with sprite key matching
+- **New:** `vision-sidecar/` directory — Moondream2 FastAPI service, port 8090, GPU-accelerated
+- **Frontend updated:** JPEG now routed via `BACKEND_HTTP_URL` to POST `/api/vision/analyze`
+- **Config changes:** Removed `GEMINI_API_KEY` from frontend; added `BACKEND_HTTP_URL` for backend routing
+- **Docker:** vision-sidecar added to docker-compose.yml with GPU reservation + health check
+- **LiteLLM:** gpt-4o-mini added as fallback model for cloud vision via LiteLLM
+- **Feed flow:** Pi double-press → JPEG sent to backend → sidecar classifies → fallback if timeout → backend returns `FoodVisionResult` → frontend applies pet feed
 
 ### Phase 9: Enhanced Food Feeding UX ✅
 - **Enhanced:** `aimon-frontend/hardware/vision-analysis-service.py` — Gemini returns `sprite_key` (food sprite filename)
@@ -627,13 +649,22 @@ PCM16 Audio Chunks
 - **UX Features:** Food sprites animate toward pet mouth, auto-eat on hunger rise or timer, max 3 concurrent sprites in queue
 - **Sprite assets:** Kebab-case filenames (apple.png, rice.png, milk-bottle.png) match sprite_key from Gemini
 
-### Phase 12: Continuous Conversation Mode with VAD 🔄 IN PROGRESS
+### Phase 12: Continuous Conversation Mode with VAD ✅
 - **New:** `aimon-frontend/audio/voice-activity-detector.py` (WebRTC VAD engine interface, ~150 LOC)
 - **Modified:** `aimon-frontend/audio/audio_capture.py` — Continuous recording mode with VAD integration
 - **Modified:** `aimon-frontend/state/state_machine.py` — Single-press toggle, continuous listening, auto-resume after playback
 - **VAD Integration:** Automatic speech end detection, configurable sensitivity, fallback timeout (30s max)
 - **UX Features:** Pulsing indicator for active listening, seamless auto-resume after TTS playback
 - **Protocol:** WebSocket v4+ (backward compatible, VAD integration transparent to client)
+
+### Frontend V2: Gameplay Overhaul ✅
+- **Landscape Display:** `whisplay_hat.py` MADCTL 0x60, `config.py` LCD_WIDTH=280/HEIGHT=240, X-axis offset
+- **Button Remapping:** A=talk, B=camera, C=quick-feed, D=quest, Main=menu/shutdown (5s hold)
+- **Food Inventory:** `food-inventory-manager.py` (JSON, FIFO max 20), Button C pops oldest item
+- **Menu Overlay:** `menu-overlay-controller.py` + renderer suite (Pet Status, Food Inventory, Badges, Map screens)
+- **Quest Integration:** Button D sends `quest_trigger`, 5s cooldown, LED feedback
+- **Layer 5 Added:** Menu overlay renders on top of 4-layer compositor
+- **Modified:** `state_machine.py`, `display_engine.py`, `layer-compositor.py`, `ws_client.py`
 
 ### Features Kept
 - PowerMem 3-layer memory ✅
