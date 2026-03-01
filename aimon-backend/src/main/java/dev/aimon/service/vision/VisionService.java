@@ -165,10 +165,17 @@ public class VisionService {
                 throw new RuntimeException("LiteLLM returned no choices: " + response.body());
             }
             String text = choices.get(0).path("message").path("content").asText();
-            log.debugf("Cloud vision raw response: %s", text);
+            log.infof("Cloud vision raw response: %s", text);
             String cleaned = extractJson(stripMarkdownFences(text));
-            JsonNode resultJson = mapper.readTree(cleaned);
-            return parseVisionResult(resultJson, elapsed, fallbackModel);
+            try {
+                JsonNode resultJson = mapper.readTree(cleaned);
+                return parseVisionResult(resultJson, elapsed, fallbackModel);
+            } catch (Exception parseEx) {
+                log.warnf("Failed to parse cloud vision JSON: %s — raw: %s", parseEx.getMessage(), text);
+                // Return description from whatever text the LLM gave
+                return FoodVisionResult.notFood(
+                    text.length() > 100 ? text.substring(0, 100) : text, elapsed, fallbackModel);
+            }
 
         } catch (Exception e) {
             throw new RuntimeException("Cloud vision failed: " + e.getMessage(), e);
