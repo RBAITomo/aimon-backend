@@ -88,11 +88,16 @@ def _classify_image(img: Image.Image) -> dict:
 
     is_food = answer.startswith("yes")
     if not is_food:
+        # Step 2b: What is it then?
+        desc_result = model.query(encoded, "What is in this image? Describe briefly in one sentence.")
+        desc = desc_result.get("answer", "") if isinstance(desc_result, dict) else str(desc_result)
+        desc = desc.strip()
+        log.info("Not-food description: '%s'", desc)
         return {
             "is_food": False,
             "food_name": None,
             "sprite_key": None,
-            "description": "Not food",
+            "description": desc or "Not food",
         }
 
     # Step 2: What food is it?
