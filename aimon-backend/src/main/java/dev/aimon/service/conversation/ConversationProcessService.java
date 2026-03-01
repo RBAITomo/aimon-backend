@@ -247,7 +247,10 @@ public class ConversationProcessService {
                     }
 
                     // Tasteless spawn check (async, non-blocking, after turn completes)
+                    // Activate CDI request context for JPA EntityManager access
                     CompletableFuture.runAsync(() -> {
+                        var rc = io.quarkus.arc.Arc.container().requestContext();
+                        rc.activate();
                         try {
                             PetProfile pet = petProfileService.getProfile(uid);
                             if (pet != null && !"EGG".equalsIgnoreCase(pet.getStage().name())) {
@@ -255,6 +258,8 @@ public class ConversationProcessService {
                             }
                         } catch (Exception e) {
                             LOG.warnf("Tasteless spawn check failed: %s", e.getMessage());
+                        } finally {
+                            rc.deactivate();
                         }
                     }, Infrastructure.getDefaultExecutor());
                 },
@@ -432,7 +437,11 @@ public class ConversationProcessService {
      */
     private void recordToPowerMemAsync(ConversationMessageRequest request, String response) {
         // Run off Vert.x event loop — topicClassifier.classify() may call blocking LLM REST
+        // Must use Infrastructure executor to keep Quarkus classloader (avoids ClassNotFoundException)
+        // Activate CDI request context for REST client and JPA access
         java.util.concurrent.CompletableFuture.runAsync(() -> {
+            var rc = io.quarkus.arc.Arc.container().requestContext();
+            rc.activate();
             try {
                 Integer robotId = parseRobotId(request);
 
@@ -468,8 +477,10 @@ public class ConversationProcessService {
                            request.getSessionId());
             } catch (Exception e) {
                 LOG.warnf(e, "Failed to record conversation to PowerMem: %s", e.getMessage());
+            } finally {
+                rc.deactivate();
             }
-        });
+        }, Infrastructure.getDefaultExecutor());
     }
 
     /**
