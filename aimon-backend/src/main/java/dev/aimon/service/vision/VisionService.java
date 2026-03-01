@@ -47,13 +47,10 @@ public class VisionService {
     );
 
     private static final String VISION_PROMPT =
-        "Analyze this image. Is it food?\n" +
-        "If food, respond JSON only: {\"is_food\": true, \"food_name\": \"<Vietnamese name>\", " +
-        "\"sprite_key\": \"<closest from list>\", \"description\": \"<brief>\"}\n" +
-        "If not food, respond JSON only: {\"is_food\": false, \"food_name\": null, " +
-        "\"sprite_key\": null, \"description\": \"<Vietnamese, child-friendly>\"}\n" +
-        "Keep descriptions under 50 words. Be child-appropriate.\n" +
-        "Sprite keys: " + SPRITE_KEYS;
+        "Analyze this image. Is it food? Respond with ONLY a JSON object, no markdown.\n" +
+        "If food: {\"is_food\":true,\"food_name\":\"<Vietnamese name>\",\"food_name_en\":\"<English name>\",\"description\":\"<brief Vietnamese>\"}\n" +
+        "If not food: {\"is_food\":false,\"food_name\":null,\"food_name_en\":null,\"description\":\"<brief Vietnamese, child-friendly>\"}\n" +
+        "Keep descriptions under 30 words.";
 
     private final HttpClient sidecarHttpClient = HttpClient.newBuilder()
         .connectTimeout(Duration.ofSeconds(2))
@@ -185,10 +182,15 @@ public class VisionService {
     private FoodVisionResult parseVisionResult(JsonNode json, int inferenceMs, String source) {
         boolean isFood = json.path("is_food").asBoolean(false);
         String foodName = json.path("food_name").isNull() ? null : json.path("food_name").asText(null);
-        String spriteKey = json.path("sprite_key").isNull() ? null : json.path("sprite_key").asText(null);
         String description = json.path("description").asText("");
 
         if (isFood) {
+            // sprite_key from sidecar (which has the full list), or derive from English name
+            String spriteKey = json.path("sprite_key").isNull() ? null : json.path("sprite_key").asText(null);
+            if (spriteKey == null || spriteKey.isBlank()) {
+                String enName = json.path("food_name_en").isNull() ? null : json.path("food_name_en").asText(null);
+                spriteKey = enName != null ? enName.toLowerCase().strip() : null;
+            }
             spriteKey = validateSpriteKey(spriteKey);
             return FoodVisionResult.food(foodName, spriteKey, description, inferenceMs, source);
         }

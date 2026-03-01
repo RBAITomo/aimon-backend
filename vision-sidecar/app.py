@@ -4,6 +4,7 @@ FastAPI service wrapping Moondream2 VLM for fast image classification.
 Designed to run as a Docker sidecar with GPU access.
 """
 
+import base64
 import io
 import json
 import logging
@@ -117,16 +118,30 @@ async def classify_base64(request: Request):
     if model is None:
         raise HTTPException(status_code=503, detail="Model not loaded")
 
-    import base64
-    body = await request.json()
+    try:
+        body = await request.json()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid JSON body: {e}")
+
     b64 = body.get("image_base64", "")
-    raw = base64.b64decode(b64)
+    if not b64:
+        raise HTTPException(status_code=400, detail="Missing image_base64 field")
+
+    try:
+        raw = base64.b64decode(b64)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid base64: {e}")
+
     if len(raw) > MAX_IMAGE_BYTES:
         raise HTTPException(status_code=413, detail="Image too large (max 5MB)")
 
-    img = Image.open(io.BytesIO(raw))
-    encoded = model.encode_image(img)
-    answer = model.query(encoded, CLASSIFY_PROMPT)["answer"]
+    try:
+        img = Image.open(io.BytesIO(raw))
+        encoded = model.encode_image(img)
+        answer = model.query(encoded, CLASSIFY_PROMPT)["answer"]
+    except Exception as e:
+        log.error("Model inference failed: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Model inference failed: {e}")
     elapsed = time.time() - t0
     log.info("Classification took %.3fs (%d bytes)", elapsed, len(raw))
 
