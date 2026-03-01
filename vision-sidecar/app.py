@@ -140,12 +140,28 @@ async def classify_base64(request: Request):
     try:
         img = Image.open(io.BytesIO(raw))
         encoded = model.encode_image(img)
-        answer = model.query(encoded, CLASSIFY_PROMPT)["answer"]
+        result = model.query(encoded, CLASSIFY_PROMPT)
+        log.info("Model raw result type=%s keys=%s", type(result).__name__,
+                 list(result.keys()) if isinstance(result, dict) else "N/A")
+        log.info("Model raw result: %s", str(result)[:500])
+        # Handle different return formats
+        if isinstance(result, dict):
+            answer = result.get("answer") or result.get("text") or str(result)
+        elif isinstance(result, str):
+            answer = result
+        else:
+            answer = str(result)
     except Exception as e:
         log.error("Model inference failed: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail=f"Model inference failed: {e}")
     elapsed = time.time() - t0
-    log.info("Classification took %.3fs (%d bytes)", elapsed, len(raw))
+    log.info("Classification took %.3fs (%d bytes), answer=%s", elapsed, len(raw), answer[:200] if answer else "None")
+
+    if not answer or answer == "None":
+        return {
+            "is_food": False, "food_name": None, "sprite_key": None,
+            "description": "Could not analyze image", "inference_ms": int(elapsed * 1000),
+        }
 
     try:
         text = answer.strip()
