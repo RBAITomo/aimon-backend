@@ -106,7 +106,6 @@ public class VisionService {
             .uri(URI.create(sidecarUrl + "/classify-base64"))
             .timeout(Duration.ofSeconds(30))
             .header("Content-Type", "application/json")
-            .header("Content-Length", String.valueOf(bodyBytes.length))
             .POST(HttpRequest.BodyPublishers.ofByteArray(bodyBytes))
             .build();
 
@@ -140,13 +139,14 @@ public class VisionService {
             String requestBody = mapper.writeValueAsString(Map.of(
                 "model", fallbackModel,
                 "messages", messages,
-                "max_tokens", 512,
+                "max_tokens", 1024,
+                "max_output_tokens", 1024,
                 "temperature", 0.1
             ));
 
             HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(litellmBaseUrl + "/v1/chat/completions"))
-                .timeout(Duration.ofSeconds(10))
+                .timeout(Duration.ofSeconds(30))
                 .header("Content-Type", "application/json")
                 .header("Authorization", "Bearer " + litellmApiKey)
                 .POST(HttpRequest.BodyPublishers.ofString(requestBody))
