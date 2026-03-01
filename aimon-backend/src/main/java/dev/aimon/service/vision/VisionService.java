@@ -53,7 +53,8 @@ public class VisionService {
         "Keep descriptions under 30 words.";
 
     private final HttpClient sidecarHttpClient = HttpClient.newBuilder()
-        .connectTimeout(Duration.ofSeconds(2))
+        .version(HttpClient.Version.HTTP_1_1)
+        .connectTimeout(Duration.ofSeconds(5))
         .build();
 
     private final HttpClient cloudHttpClient = HttpClient.newBuilder()
