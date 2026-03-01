@@ -98,13 +98,16 @@ public class VisionService {
     private FoodVisionResult classifyViaSidecar(byte[] jpegBytes) throws Exception {
         String base64 = Base64.getEncoder().encodeToString(jpegBytes);
         String requestBody = mapper.writeValueAsString(Map.of("image_base64", base64));
+        byte[] bodyBytes = requestBody.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        log.infof("Sidecar request: %d bytes image → %d bytes JSON body", jpegBytes.length, bodyBytes.length);
 
         long t0 = System.currentTimeMillis();
         HttpRequest request = HttpRequest.newBuilder()
             .uri(URI.create(sidecarUrl + "/classify-base64"))
-            .timeout(Duration.ofMillis(sidecarTimeoutMs))
+            .timeout(Duration.ofSeconds(30))
             .header("Content-Type", "application/json")
-            .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+            .header("Content-Length", String.valueOf(bodyBytes.length))
+            .POST(HttpRequest.BodyPublishers.ofByteArray(bodyBytes))
             .build();
 
         HttpResponse<String> response = sidecarHttpClient.send(request, HttpResponse.BodyHandlers.ofString());

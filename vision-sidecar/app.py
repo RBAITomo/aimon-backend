@@ -118,8 +118,10 @@ async def classify_base64(request: Request):
     if model is None:
         raise HTTPException(status_code=503, detail="Model not loaded")
 
+    raw_body = await request.body()
+    log.info("Received %d bytes body", len(raw_body))
     try:
-        body = await request.json()
+        body = json.loads(raw_body)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid JSON body: {e}")
 
