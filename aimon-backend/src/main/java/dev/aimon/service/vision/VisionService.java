@@ -165,7 +165,9 @@ public class VisionService {
                 throw new RuntimeException("LiteLLM returned no choices: " + response.body());
             }
             String text = choices.get(0).path("message").path("content").asText();
-            JsonNode resultJson = mapper.readTree(stripMarkdownFences(text));
+            log.debugf("Cloud vision raw response: %s", text);
+            String cleaned = extractJson(stripMarkdownFences(text));
+            JsonNode resultJson = mapper.readTree(cleaned);
             return parseVisionResult(resultJson, elapsed, fallbackModel);
 
         } catch (Exception e) {
@@ -196,6 +198,26 @@ public class VisionService {
             if (k.toLowerCase().equals(lower)) return k;
         }
         return "default";
+    }
+
+    /**
+     * Extract the first complete JSON object from text.
+     * Handles cases where LLM adds text before/after JSON or truncates output.
+     */
+    private String extractJson(String text) {
+        int start = text.indexOf('{');
+        if (start < 0) return text;
+        int depth = 0;
+        for (int i = start; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c == '{') depth++;
+            else if (c == '}') {
+                depth--;
+                if (depth == 0) return text.substring(start, i + 1);
+            }
+        }
+        // No complete JSON found — return from first brace anyway (will fail with clear error)
+        return text.substring(start);
     }
 
     private String stripMarkdownFences(String text) {

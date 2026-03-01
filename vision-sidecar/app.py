@@ -10,7 +10,7 @@ import logging
 import time
 
 import moondream as md
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import Body, FastAPI, HTTPException, UploadFile, File
 from PIL import Image
 
 logging.basicConfig(level=logging.INFO)
@@ -110,7 +110,7 @@ async def classify(image: UploadFile = File(...)):
 
 
 @app.post("/classify-base64")
-async def classify_base64(body: dict):
+async def classify_base64(body: dict = Body(...)):
     """Classify a base64-encoded JPEG image for food detection."""
     MAX_IMAGE_BYTES = 5 * 1024 * 1024
     t0 = time.time()
