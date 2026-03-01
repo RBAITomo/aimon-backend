@@ -89,6 +89,7 @@ public class AimonWebSocket {
                     case "offline_sync" -> petMessageHandler.handleOfflineSync(petId, getUserId(petId), message, connection);
                     case "combat_special" -> petMessageHandler.handleCombatSpecial(petId, getUserId(petId), message, connection);
                     case "location_switch" -> petMessageHandler.handleLocationSwitch(petId, getUserId(petId), message, connection);
+                    case "vision_describe" -> handleVisionDescribe(petId, message, connection);
                     default -> sendError(connection, "UNKNOWN_TYPE", "Unknown message type: " + type);
                 };
             } catch (Exception e) {
@@ -268,6 +269,28 @@ public class AimonWebSocket {
 
             // Stream response
             responseStream.streamResponse(transcript.trim(), session, connection);
+            return null;
+        })
+        .runSubscriptionOn(Infrastructure.getDefaultWorkerPool())
+        .replaceWithVoid();
+    }
+
+    private Uni<Void> handleVisionDescribe(String petId, JsonNode message, WebSocketConnection connection) {
+        RobotSession session = sessions.get(petId);
+        if (session == null) {
+            return sendError(connection, "NO_SESSION", "Session not found");
+        }
+        String description = message.has("description") ? message.get("description").asText("") : "";
+        if (description.isBlank()) {
+            return sendError(connection, "INVALID_INPUT", "Missing description");
+        }
+
+        session.setState(SessionState.PROCESSING);
+        String prompt = "[Camera saw: " + description + "] React to what the camera sees. Be playful and child-friendly. Respond in Vietnamese.";
+        LOG.infof("Robot %s: Vision describe — %s", petId, description);
+
+        return Uni.createFrom().item(() -> {
+            responseStream.streamResponse(prompt, session, connection);
             return null;
         })
         .runSubscriptionOn(Infrastructure.getDefaultWorkerPool())
