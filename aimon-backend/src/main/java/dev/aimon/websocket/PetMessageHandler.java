@@ -13,6 +13,7 @@ import dev.aimon.service.combat.CombatResultHandler;
 import dev.aimon.service.combat.CombatService;
 import dev.aimon.service.combat.CombatSessionState;
 import dev.aimon.service.world.LocationService;
+import dev.aimon.service.world.SubLocation;
 import dev.aimon.service.conversation.ConversationSessionManager;
 import dev.aimon.service.pet.BadgeService;
 import dev.aimon.service.pet.PetEvolutionService;
@@ -310,6 +311,95 @@ public class PetMessageHandler {
     }
 
     /**
+     * Handle mini_game_start: validate energy + location, deduct energy, respond ready.
+     */
+    public Uni<Void> handleMiniGameStart(String robotId, Long userId, JsonNode message, WebSocketConnection connection) {
+        return Uni.createFrom().item(() -> {
+            ManagedContext rc = Arc.container().requestContext();
+            boolean activated = !rc.isActive();
+            if (activated) rc.activate();
+            try {
+                PetProfile profile = petService.getOrCreateProfile(userId);
+
+                // Validate location
+                boolean atMeadow = SubLocation.fromCode(profile.getCurrentLocation())
+                    .filter(loc -> loc == SubLocation.MARSHMALLOW_MEADOW)
+                    .isPresent();
+                if (!atMeadow) {
+                    return java.util.Map.of("allowed", false, "reason", "not_at_marshmallow_meadow");
+                }
+
+                // Validate energy
+                if (profile.getEnergy() < 20) {
+                    return java.util.Map.of("allowed", false, "reason", "insufficient_energy");
+                }
+
+                // Deduct energy
+                petService.deductEnergy(userId, 20);
+
+                return java.util.Map.<String, Object>of("allowed", true);
+            } catch (Exception e) {
+                LOG.errorf(e, "mini_game_start failed userId=%d", userId);
+                return java.util.Map.of("allowed", false, "reason", "error");
+            } finally {
+                if (activated) rc.terminate();
+            }
+        })
+        .runSubscriptionOn(Infrastructure.getDefaultWorkerPool())
+        .onItem().transformToUni(result -> {
+            ObjectNode msg = objectMapper.createObjectNode();
+            boolean allowed = Boolean.TRUE.equals(result.get("allowed"));
+            msg.put("type", PetMessageTypes.MINI_GAME_READY);
+            msg.put("success", allowed);
+            if (!allowed) {
+                Object reason = result.get("reason");
+                msg.put("reason", reason != null ? reason.toString() : "unknown");
+            }
+            return sendJson(connection, msg)
+                .chain(() -> sendPetStatus(userId, connection));
+        });
+    }
+
+    /**
+     * Handle mini_game_result: validate score, calc cotton candy reward, add XP.
+     */
+    public Uni<Void> handleMiniGameResult(String robotId, Long userId, JsonNode message, WebSocketConnection connection) {
+        return Uni.createFrom().item(() -> {
+            ManagedContext rc = Arc.container().requestContext();
+            boolean activated = !rc.isActive();
+            if (activated) rc.activate();
+            try {
+                int score = message.has("score") ? message.get("score").asInt(0) : 0;
+
+                // Validate score — cap at theoretical max
+                int MAX_SCORE = 1800;
+                score = Math.min(Math.max(score, 0), MAX_SCORE);
+
+                int cottonCandy = score / 50;
+
+                // Flat 5 XP reward for playing
+                petService.addXp(userId, 5);
+
+                return java.util.Map.of("score", score, "cotton_candy", cottonCandy);
+            } catch (Exception e) {
+                LOG.errorf(e, "mini_game_result failed userId=%d", userId);
+                return java.util.Map.of("score", 0, "cotton_candy", 0);
+            } finally {
+                if (activated) rc.terminate();
+            }
+        })
+        .runSubscriptionOn(Infrastructure.getDefaultWorkerPool())
+        .onItem().transformToUni(result -> {
+            ObjectNode msg = objectMapper.createObjectNode();
+            msg.put("type", PetMessageTypes.MINI_GAME_REWARD);
+            msg.put("score", (int) result.get("score"));
+            msg.put("cotton_candy", (int) result.get("cotton_candy"));
+            return sendJson(connection, msg)
+                .chain(() -> sendPetStatus(userId, connection));
+        });
+    }
+
+    /**
      * Handle combat_special from client: special_move or evolution_move.
      * Sets player input on pending combat state. Combat resolves on 5s timeout or this trigger.
      */
@@ -401,7 +491,9 @@ public class PetMessageHandler {
             profile.getAffinity(),
             profile.getLoginStreak(),
             questText, questCategory, questDifficulty,
-            null
+            SubLocation.fromCode(profile.getCurrentLocation())
+                .map(SubLocation::getBackgroundFile)
+                .orElse(SubLocation.getDefaultBackground(profile.getCurrentLocation()))
         );
     }
 
@@ -429,6 +521,9 @@ public class PetMessageHandler {
             quest.put("category", status.pendingQuestCategory());
             quest.put("difficulty", status.pendingQuestDifficulty());
             msg.set("quest", quest);
+        }
+        if (status.background() != null) {
+            msg.put("background", status.background());
         }
         return msg;
     }

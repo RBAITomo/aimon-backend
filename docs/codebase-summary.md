@@ -5,7 +5,7 @@
 
 ## Overview
 
-AI-MON is a voice-driven AI companion for Raspberry Pi with personality, memory, safety filtering, world lore immersion, dynamic location travel, and on-device camera vision. The refactored `aimon-backend` is a clean, focused Java/Quarkus backend. Phase 12 introduced continuous conversation mode with WebRTC VAD. Frontend V2 adds landscape display rotation (280x240), 4-button gameplay (A=talk, B=camera, C=quick-feed, D=quest), food inventory persistence (JSON, FIFO max 20), and menu overlay system with 4 screens (Pet Status, Food Inventory, Badges, Map).
+AI-MON is a voice-driven AI companion for Raspberry Pi with personality, memory, safety filtering, world lore immersion, dynamic location travel, on-device camera vision, and arcade mini-games. The refactored `aimon-backend` is a clean, focused Java/Quarkus backend. Phase 12 introduced continuous conversation mode with WebRTC VAD. Phase 14 added Food Catcher mini-game (energy-gated, catch-based scoring, cotton candy rewards). Frontend V2 adds landscape display rotation (280x240), 4-button gameplay (A=talk, B=camera, C=quick-feed, D=quest/mini-game), food inventory persistence (JSON, FIFO max 20), and menu overlay system with 4 screens (Pet Status, Food Inventory, Badges, Map).
 
 **Metrics:**
 - **File Reduction:** 90 → 47 files (48% reduction)
@@ -148,10 +148,13 @@ aimon-frontend/
 ├── main.py                       # Entry point: init HAT, display, state machine
 │
 ├── state/
-│   ├── state_machine.py (500+ LOC)      # Orchestrator: IDLE→LISTENING→ASR→ANSWER→EMOTION + menu + quest
+│   ├── state_machine.py (500+ LOC)      # Orchestrator: IDLE→LISTENING→ASR→ANSWER→EMOTION + menu + quest + mini-game (Phase 14)
 │   ├── pet-event-handler.py (~157 LOC)  # Pet event callbacks, SFX, badge/quest/evolution (Phase 7)
 │   ├── food-inventory-manager.py (~80 LOC) # Persistent JSON inventory, FIFO max 20 items (V2)
 │   ├── menu-overlay-controller.py (~120 LOC) # Menu state machine, navigation (V2)
+│   ├── mini-game-controller.py (~100 LOC) # Mini-game state, collision, scoring (Phase 14)
+│   ├── mini-game-renderer.py (~85 LOC)  # Render game board, score, pet, items (Phase 14)
+│   ├── mini-game-objects.py (~80 LOC)   # FallingItem, HazardSpawner, Player classes (Phase 14)
 │   └── __init__.py
 │
 ├── display/                      # 5-layer compositor (+ menu overlay layer)
@@ -200,12 +203,13 @@ aimon-frontend/
 ```
 
 **Key Metrics:**
-- 13 modules + handlers + vision hardware, ~2,000 LOC (Python)
+- 16 modules + handlers + vision hardware + mini-game, ~2,300 LOC (Python)
 - 5-layer compositor (+ menu overlay) with dirty-region caching: 2-3 blits/frame
 - SFX: 3 reserved channels with TTS ducking
 - Food inventory: JSON persistence, FIFO max 20, auto-evict oldest
-- Button mapping: A=talk, B=camera, C=quick-feed, D=quest, Main=menu/shutdown
+- Button mapping: A=talk, B=camera, C=quick-feed, D=quest/mini-game, Main=menu/shutdown
 - Menu navigation: 4 screens (Pet Status, Food Inventory, Badges, Map)
+- Mini-game: Arcade gameplay (catch/dodge), 90s timer, 30 FPS rendering, location-gated (Meadow)
 - Landscape display: 280x240 (MADCTL 0x60), offset on X-axis
 - Target: 30 FPS on Pi Zero 2; adaptive idle fps
 - Vision: Gemini 2.5 Flash called directly from Pi (no data sent over WS)
@@ -218,10 +222,11 @@ aimon-frontend/
 ### WebSocket Handler
 **`AimonWebSocket` (277 LOC)**
 - Endpoint: `ws://localhost:8080/ws/audio/{robotId}`
-- Protocol: v4 (push-to-talk, simplified) + 9 new pet message types (Phase 7)
-- States: IDLE → LISTENING → PROCESSING → RESPONDING + quest/evolution overlays
+- Protocol: v4 (push-to-talk, simplified) + pet/mini-game message types (Phase 7, 14)
+- States: IDLE → LISTENING → PROCESSING → RESPONDING + quest/evolution/mini-game overlays
 - Handles: hello, audio_start, audio frames, audio_stop, interrupt, ping/pong
 - Pet messages: pet_status, pet_feed_result, badge_earned, pet_evolution, pet_transform, pet_warning, pet_regression, quest_start, camera_result
+- Mini-game messages (Phase 14): mini_game_start, mini_game_ready, mini_game_result, mini_game_reward
 
 ### Audio Pipeline
 **`AudioPipelineService`**

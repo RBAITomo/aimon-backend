@@ -624,7 +624,7 @@ PowerMem Tables (Managed by memoryservice)
 
 ---
 
-### Phase 12: Continuous Conversation Mode with VAD 🔄 IN PROGRESS
+### Phase 12: Continuous Conversation Mode with VAD ✅ COMPLETE
 
 **Purpose:** Replace push-to-talk with single-press continuous mode using WebRTC VAD for automatic speech detection.
 
@@ -654,6 +654,57 @@ PowerMem Tables (Managed by memoryservice)
 - 2 modified frontend modules (audio_capture, state_machine)
 - Updated WebSocket protocol documentation (v4+)
 - Configuration constants for VAD sensitivity
+
+---
+
+---
+
+### Phase 14: Food Catcher Mini-Game ✅ COMPLETE
+
+**Purpose:** Add location-gated arcade mini-game for interactive engagement and reward loop (cotton candy inventory).
+
+**Feature Overview:**
+- **Gameplay:** Pet moves left/right catching falling food items, avoiding hazards (rocks, trash)
+- **Trigger:** Menu button (D) or conversation intent ("play a game", "let's play")
+- **Energy Cost:** 20 energy deducted on start
+- **Reward:** Cotton candy scored from catch value (food: +1-3, hazard: -5 each)
+- **Location:** Unlocked at Meadow location (Sweet Dominion)
+- **UI:** Full-screen mini-game with score, pet sprite, falling items, timer
+- **Assets:** cotton-candy.png, hazard_rock.png, hazard_trash.png, mini-game-meadow.png background
+
+**Technical Implementation:**
+- **Backend Changes:**
+  - 4 new WebSocket message types: `mini_game_start`, `mini_game_ready`, `mini_game_result`, `mini_game_reward`
+  - 2 new message handlers in `PetMessageHandler`: `onMiniGameStart()`, `onMiniGameResult()`
+  - `deductEnergy()` method in `PetProfileService` for 20-energy cost
+  - Reward distribution logic (cotton candy → food inventory)
+
+- **Frontend Changes:**
+  - 3 new Python modules in `aimon-frontend/`:
+    - `mini-game-objects.py` — Game object classes (FallingItem, HazardSpawner, Player)
+    - `mini-game-controller.py` — Game state machine, collision detection, scoring logic
+    - `mini-game-renderer.py` — Renders game board, score, pet, falling items to Pygame surface
+  - State.MINI_GAME in state machine for overlay integration
+  - MenuItem.MINI_GAME in menu system for quest button (D) trigger
+  - Game loop: 30 FPS, auto-pause on TTS, 90-second max game time
+
+- **Database:** No schema changes (uses existing pet_profiles, food_inventory)
+
+**WebSocket Protocol Extension:**
+```
+mini_game_start    C→S  {location_id}                    # Request game start
+mini_game_ready    S→C  {timer_seconds, energy_remaining} # Game ready, proceed
+mini_game_result   C→S  {score, final_catch_count}      # Game over, send score
+mini_game_reward   S→C  {cotton_candy_earned, energy_updated} # Award result
+```
+
+**Deliverables:**
+- 2 backend message handlers (~80 LOC total)
+- 1 energy deduction service method (~10 LOC)
+- 3 frontend mini-game modules (~300 LOC total)
+- 4 asset PNG files (food sprites, backgrounds)
+- Integration with State machine (MINI_GAME state)
+- Integration with menu system (MenuItem.MINI_GAME)
 
 ---
 
@@ -827,6 +878,7 @@ PowerMem Tables (Managed by memoryservice)
 - ✅ All core services
 - ✅ Docker Compose setup
 - ✅ Comprehensive documentation
+- ✅ Phase 14: Food Catcher mini-game (arcade gameplay, energy-gated, cotton candy rewards)
 
 ### Planned (v0.3 - Post-Production)
 

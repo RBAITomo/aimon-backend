@@ -89,6 +89,8 @@ public class AimonWebSocket {
                     case "offline_sync" -> petMessageHandler.handleOfflineSync(petId, getUserId(petId), message, connection);
                     case "combat_special" -> petMessageHandler.handleCombatSpecial(petId, getUserId(petId), message, connection);
                     case "location_switch" -> petMessageHandler.handleLocationSwitch(petId, getUserId(petId), message, connection);
+                    case "mini_game_start" -> petMessageHandler.handleMiniGameStart(petId, getUserId(petId), message, connection);
+                    case "mini_game_result" -> petMessageHandler.handleMiniGameResult(petId, getUserId(petId), message, connection);
                     case "vision_describe" -> handleVisionDescribe(petId, message, connection);
                     default -> sendError(connection, "UNKNOWN_TYPE", "Unknown message type: " + type);
                 };

@@ -254,11 +254,13 @@ class DisplayEngine:
 | `hardware/vision-analysis-service.py` | Gemini 2.5 Flash vision: JPEG → `{is_food, food_name, description}` JSON. |
 | `storage/turn_logger.py` | Log conversations for debugging & analytics. |
 
-**Protocol:** WebSocket v4+ (continuous conversation mode + pet events; Phase 12 VAD integration)
+**Protocol:** WebSocket v4+ (continuous conversation mode + pet events + mini-game; Phase 12 VAD, Phase 14 mini-game)
 - Binary OPUS frames (input, 48kHz) / PCM16 chunks (output, 16kHz)
-- JSON control + pet messages (21 message types total)
+- JSON control + pet messages (25 message types total)
 - Keepalive (ping/pong)
+- Conversation: hello, hello_ack, audio_start, audio_frames, audio_stop, asr_result, llm_stream, tts_start, tts_audio, tts_stop, turn_end, interrupt
 - Pet events: pet_status, pet_feed_result, badge_earned, pet_evolution, pet_transform, pet_transform_end, pet_warning, pet_regression, quest_start, camera_result
+- Mini-game (Phase 14): mini_game_start, mini_game_ready, mini_game_result, mini_game_reward
 
 ---
 

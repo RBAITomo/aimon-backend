@@ -1,6 +1,7 @@
 package dev.aimon.service.pet;
 
 import dev.aimon.dto.pet.PetStatusDto;
+import dev.aimon.service.world.SubLocation;
 import dev.aimon.entity.pet.PetProfile;
 import dev.aimon.model.PetActionEvent;
 import dev.aimon.model.PetMood;
@@ -172,6 +173,17 @@ public class PetProfileService {
     }
 
     /**
+     * Deduct energy (clamped to 0). Used by mini-game start.
+     */
+    @Transactional
+    public void deductEnergy(Long userId, int amount) {
+        PetProfile profile = getOrCreateProfile(userId);
+        int oldEnergy = profile.getEnergy();
+        profile.setEnergy(clamp(oldEnergy - amount, 0, 100));
+        LOG.infof("User %d energy deducted: %d -> %d", userId, oldEnergy, profile.getEnergy());
+    }
+
+    /**
      * Add XP and handle level-up with evolution check.
      */
     @Transactional
@@ -282,7 +294,10 @@ public class PetProfileService {
             xpForNext,
             profile.getAffinity(),
             profile.getLoginStreak(),
-            null, null, null, null
+            null, null, null,
+            SubLocation.fromCode(profile.getCurrentLocation())
+                .map(SubLocation::getBackgroundFile)
+                .orElse(SubLocation.getDefaultBackground(profile.getCurrentLocation()))
         );
     }
 

@@ -82,4 +82,18 @@ public final class PetMessageTypes {
 
     // Server → Client: Noir quest evaluation result
     public static final String NOIR_QUEST_RESULT = "noir_quest_result";
+
+    // --- Mini-game (Food Catcher) ---
+
+    // Client → Server: Start mini-game request
+    public static final String MINI_GAME_START = "mini_game_start";
+
+    // Client → Server: Submit mini-game score
+    public static final String MINI_GAME_RESULT = "mini_game_result";
+
+    // Server → Client: Mini-game ready (or rejected)
+    public static final String MINI_GAME_READY = "mini_game_ready";
+
+    // Server → Client: Mini-game reward (cotton candy count)
+    public static final String MINI_GAME_REWARD = "mini_game_reward";
 }
