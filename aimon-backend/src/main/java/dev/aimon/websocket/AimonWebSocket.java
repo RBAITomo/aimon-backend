@@ -92,6 +92,7 @@ public class AimonWebSocket {
                     case "mini_game_start" -> petMessageHandler.handleMiniGameStart(petId, getUserId(petId), message, connection);
                     case "mini_game_result" -> petMessageHandler.handleMiniGameResult(petId, getUserId(petId), message, connection);
                     case "vision_describe" -> handleVisionDescribe(petId, message, connection);
+                    case "pet_action" -> petMessageHandler.handlePetAction(petId, getUserId(petId), message, connection);
                     default -> sendError(connection, "UNKNOWN_TYPE", "Unknown message type: " + type);
                 };
             } catch (Exception e) {

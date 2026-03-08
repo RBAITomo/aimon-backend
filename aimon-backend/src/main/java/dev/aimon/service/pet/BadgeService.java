@@ -177,7 +177,9 @@ public class BadgeService {
 
             // Fire event
             badgeEvent.fire(new BadgeEarnedEvent(
-                userId, badge.getCode(), badge.getName(), badge.getXpReward()));
+                userId, badge.getCode(), badge.getName(),
+                badge.getDescription() != null ? badge.getDescription() : "",
+                badge.getXpReward()));
         }
     }
 

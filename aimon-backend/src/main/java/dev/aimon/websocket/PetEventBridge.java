@@ -51,7 +51,8 @@ public class PetEventBridge {
         ObjectNode message = objectMapper.createObjectNode();
         message.put("type", PetMessageTypes.BADGE_EARNED);
         message.put("badge_code", event.badgeCode());
-        message.put("badge_name", event.badgeName());
+        message.put("name", event.badgeName());
+        message.put("description", event.badgeDescription());
         message.put("xp_reward", event.xpReward());
 
         sendToUser(event.userId(), message);
@@ -296,10 +297,10 @@ public class PetEventBridge {
         String questCategory = quest != null ? quest.category() : null;
         String questDifficulty = quest != null ? quest.difficulty() : null;
 
-        // Resolve background from current sub-location
+        // Resolve background from current sub-location (fallback to default for region)
         String background = SubLocation.fromCode(profile.getCurrentLocation())
             .map(SubLocation::getBackgroundFile)
-            .orElse(null);
+            .orElse(SubLocation.getDefaultBackground(profile.getCurrentLocation()));
 
         return new PetStatusDto(
             profile.getName(),

@@ -1,12 +1,259 @@
 # AI-MON Project Changelog
 
-**Last Updated:** 2026-02-24
+**Last Updated:** 2026-03-08
 
 All significant changes, features, and fixes are documented here, ordered chronologically (newest first).
 
 ---
 
 ## Version 0.2+ (Current - In Development)
+
+### [Phase 16] Food Journal + Badge System Overhaul — 2026-03-08
+
+**Status:** IN PROGRESS (Phases 1-6 COMPLETE, Phase 7 Testing)
+
+**Scope:** Persistent food journal (cookbook) tracking unique foods photographed + complete badge system refresh (backend fixes, screen UI, sprites, milestone badges).
+
+#### New Features
+
+##### Food Journal & Cookbook (Phases 1-3, 6)
+- **FoodJournalManager**: Persistent JSON storage of discovered foods, keyed by `sprite_key` (deterministic dedup)
+  - Fields: `name_vi, sprite_key, first_seen (ISO), count, region_hint`
+  - Atomic writes (tempfile + os.replace) for crash safety
+  - Thread-safe via `threading.Lock`
+- **food-region-map.json**: Static mapping of sprite_key to Cotton Land sub-locations (Meadow, Spire, Hills, etc.)
+  - Wildcard prefix matching support (e.g., `fruit_*` → Vanilla Promenade)
+  - Fallback to `_default` for unmapped sprites
+- **CookbookScreenRenderer**: Grid UI (5x4 per page)
+  - Discovered foods: full-color sprite + Vietnamese name
+  - Undiscovered foods: grey square placeholder
+  - Page navigation via A/D buttons
+  - Counter: "X/105 mon da kham pha"
+- **MenuItem.COOKBOOK**: New menu item in carousel navigation
+
+##### Badge System Fixes & Overhaul (Phases 4-5)
+- **PetEventBridge fixes**: Corrected WS badge_earned keys (`name`, `description`, `badge_code`, `xp_reward`)
+- **BadgeEarnedEvent**: Added `description` field
+- **AimonWebSocket pet_action handler**: New case for `pet_action` messages → BadgeService counter increments
+- **BadgeResource REST endpoint**: GET `/api/badges/{userId}` returns all badges with earned status + progress
+- **BadgeScreenRenderer**: Replaces placeholder
+  - Grid layout (5x2 per page = 10 badges)
+  - Earned badges: colored sprite
+  - Unearned badges: greyed-out + lock icon overlay
+  - Detail view: name, description, progress bar, XP reward
+  - Navigation: C/D move selection, A shows detail, B back
+
+##### Cookbook Milestone Badges (Phase 6)
+- **4 new badges** at unique food thresholds (10, 25, 50, 100)
+  - 10 foods: `cookbook_explorer` (Người Khám Phá) — 50 XP
+  - 25 foods: `cookbook_apprentice` (Đầu Bếp Nhí) — 100 XP
+  - 50 foods: `cookbook_chef` (Bếp Trưởng) — 200 XP
+  - 100 foods: `cookbook_master` (Bậc Thầy Ẩm Thực) — 500 XP
+- **V9__cookbook_badges.sql migration**: Seed 4 badges into DB with COUNTER condition type
+- **Flow**: New unique food → `pet_action` WS event → backend badge check → `badge_earned` popup with sprite
+
+#### Files Created
+
+**Backend:**
+- `BadgeResource.java` (REST endpoint)
+- `BadgeDto.java` (Response DTO)
+- `V9__cookbook_badges.sql` (DB migration)
+- Badge sprite PNGs (10 files): `assets/badges/{code}.png` (32x32)
+
+**Frontend:**
+- `state/food-journal-manager.py` (~120 LOC) — Journal persistence
+- `data/food-region-map.json` — Region mappings
+- `display/cookbook-screen-renderer.py` (~140 LOC) — Grid UI
+- `display/badge-screen-renderer.py` (~180 LOC) — Badge grid + detail
+- Badge sprite PNGs (10 files): `assets/badges/*.png`
+
+#### Files Modified
+
+**Backend:**
+- `PetEventBridge.java` — Fixed badge_earned keys + added description
+- `AimonWebSocket.java` — Added pet_action case in dispatcher
+- `BadgeEarnedEvent.java` — Added description field
+
+**Frontend:**
+- `config.py` — Added food journal + badge asset paths, grid constants
+- `state/menu-overlay-controller.py` — Added MenuItem.COOKBOOK
+- `state/state_machine.py` — Initialized FoodJournalManager, hooked journal.record() into food detection flow, send pet_action on new food
+- `display/menu-overlay-renderer.py` — Wired CookbookScreenRenderer + new badge-screen-renderer
+- `display/badge-popup-renderer.py` — Enhanced to show badge sprite icon
+- `state/pet-event-handler.py` — Badge cache management
+
+#### Architecture
+
+```
+Food Detection Flow:
+  Camera → VisionAnalysisService
+    → FoodInventoryManager (transient)
+    → FoodJournalManager.record() [NEW]
+      → is_new? → unique_count check
+      → Milestone threshold? → send pet_action
+      → backend badge check → badge_earned event
+
+Badge Screen Integration:
+  Menu → MenuItem.COOKBOOK / BADGES
+    → CookbookScreenRenderer / BadgeScreenRenderer
+    → Fetches data from food_journal + badge cache
+    → A/D navigate, C select, B detail/back
+```
+
+#### Database Changes
+
+**V9 Migration:**
+- 4 new badge rows (cookbook_explorer, apprentice, chef, master)
+- Condition type: COUNTER
+- Config: `{"action":"unique_food","count":10/25/50/100}`
+- XP rewards: 50/100/200/500
+
+#### Testing (Phase 7)
+
+- [x] Compile checks passed (all phases)
+- [x] Unit tests: FoodJournalManager (CRUD, thread-safety, region resolution)
+- [x] Unit tests: CookbookScreenRenderer (grid layout, pagination)
+- [x] Unit tests: BadgeScreenRenderer (grid + detail views, greyed-out unearned)
+- [x] Integration tests: Camera → journal → cookbook menu
+- [x] Integration tests: Milestone detection → pet_action → badge popup
+- [x] Manual flow: 10th unique food → cookbook_explorer badge earned
+- [ ] Pi Zero performance validation (in progress)
+
+#### Breaking Changes
+
+None. Backward compatible. New features integrated via existing menu system.
+
+#### Impact Summary
+
+**Frontend:** +3 modules (~440 LOC), +10 badge PNG assets, modified 4 existing files
+**Backend:** +2 classes, +1 migration, modified 3 existing files
+**Database:** +4 badge rows (V9 migration)
+**Total New LOC:** ~220 backend + 440 frontend = ~660 LOC
+
+---
+
+### [Phase 15] Tasteless Combat + Memory Shards + Noir Quest — 2026-03-07
+
+**Status:** COMPLETE
+
+**Scope:** Turn-based auto-combat encounters, milestone/side shard drops, location unlock gates, Noir quest system, Final Arc awakening, World Vocabulary STT hints.
+
+#### New Features
+
+##### Combat System (Tasteless)
+- **TastelessConfig entity:** Stores boss stats (HP, attack, defense, shard_type, min_level, region)
+- **CombatLog entity:** Records turn outcomes (who attacked, damage dealt, XP gained)
+- **CombatService:** Orchestrates turn-based battles, stat-based power calculation
+- **CombatPowerCalculator:** Derives damage from pet level + happiness + hunger
+- **CombatResultHandler:** Processes combat end (XP grant, level-up, shard drop)
+- **CombatSessionState:** Tracks active battle (current_turn, pet_hp, enemy_hp, exchange_queue)
+- **TastelessSpawnService:** Randomizes boss encounters per region, checks encounter thresholds
+- **Database:** V6 migration: `tasteless_config` table with 5 boss + 10 common enemy seed
+- **Events:** CombatRoundEvent, CombatWonEvent, CombatLostEvent, TastelessEncounterEvent
+
+##### Memory Shard Progression
+- **UserShard entity:** Tracks shard ownership (type, unlocked_at, unlocked_from_event)
+- **ShardService:** Handles shard grants on combat win (boss=guaranteed MILESTONE, common=20% SIDE chance)
+- **Shard Types:** MILESTONE (5 total), SIDE (multiple per type)
+- **Events:** ShardUnlockedEvent fired on each grant
+- **Frontend:** Shard badges awarded, visual celebration
+- **Unlock Gates:** Locations locked until N shards collected (enum-based rules per region)
+
+##### Noir Quest System
+- **NoirQuestService:** 1 quest/day, Bitter Hollow location, post-Noir-Coneko boss
+- **NoirQuestionBank:** 20 emotional questions (Vietnamese, hardcoded)
+- **NoirResponseEvaluator:** LLM-based emotional depth grading (score 0-10, pass≥6)
+- **Database:** V7 migration: `noir_last_attempt` column (user table) + cooldown check
+- **Shard Reward:** Pass = grant 1 MILESTONE shard; fail = narrative feedback, retry next day
+- **Configuration:** `noir.enabled`, `noir.pass-threshold=6`
+
+##### Location Unlock System
+- **LocationUnlockRule enum:** Predefined gates per Sweet Dominion location
+  - Example: Whipcream Spire unlocks at level 5 + 1 MILESTONE shard
+- **LocationService:** Validates travel eligibility, returns UnlockRequirements
+- **Frontend:** Shows "Locked: Need level X + Y shards" prompt if ineligible
+- **Events:** LocationUnlockEvent on first visit to unlocked location
+
+##### Final Arc Service
+- **FinalArcService:** Triggers when pet collects all 5 MILESTONE shards
+- **Flavorcore Awakening:** Special WebSocket message sent to frontend
+- **Final Arc Event:** FinalArcUnlockEvent fired, triggers ending sequence
+- **Visual:** Screen flash, special animation, ending narration
+
+##### World Vocabulary (Renumbered V8)
+- **V6 migration removed, V8 migration added** — Prevents DB schema drift
+- `world_vocabulary` table (same structure): world_code, term, min_level, is_active
+- ~36 Cotton Land terms seeded (proper nouns, locations, factions)
+- STT phrase hints sent to Google via boost=15.0 on session start
+
+#### New Files
+
+| File | Purpose |
+|------|---------|
+| `service/combat/CombatService` | Turn-based battle orchestrator |
+| `service/combat/CombatPowerCalculator` | Pet damage formula |
+| `service/combat/CombatResultHandler` | XP/shard grant logic |
+| `service/combat/CombatSessionState` | Active battle state |
+| `service/combat/TastelessSpawnService` | Enemy encounter spawning |
+| `service/world/ShardService` | Shard ownership & grant |
+| `service/world/NoirQuestService` | Daily emotional quest |
+| `service/world/NoirQuestionBank` | Vietnamese questions |
+| `service/world/NoirResponseEvaluator` | LLM emotional scoring |
+| `service/world/FinalArcService` | 5-shard ending trigger |
+| `service/world/LocationUnlockRule` | Enum: per-location gates |
+| `service/world/LocationService` | Location eligibility check |
+| `entity/combat/TastelessConfig` | Boss/enemy stats |
+| `entity/combat/CombatLog` | Battle history |
+| `entity/world/UserShard` | Shard tracking |
+| `dto/combat/CombatRoundDto` | Round state DTO |
+| `dto/combat/CombatOutcome` | Turn result DTO |
+| `dto/world/ShardDto` | Shard info DTO |
+| `dto/world/LocationDto` | Location data DTO |
+| `repository/combat/TastelessConfigRepository` | Boss queries |
+| `repository/combat/CombatLogRepository` | Battle log queries |
+| `repository/world/UserShardRepository` | Shard queries |
+| `model/CombatRoundEvent` | CDI event |
+| `model/CombatWonEvent` | CDI event |
+| `model/CombatLostEvent` | CDI event |
+| `model/TastelessEncounterEvent` | CDI event |
+| `model/ShardUnlockedEvent` | CDI event |
+| `model/LocationUnlockEvent` | CDI event |
+| `model/FinalArcUnlockEvent` | CDI event |
+| `db/migration/V6__tasteless_combat_system.sql` | Combat schema + seed (5 boss + 10 common) |
+| `db/migration/V7__noir_quest_tracking.sql` | noir_last_attempt column |
+| `db/migration/V8__world_vocabulary.sql` | world_vocabulary table (renamed from V6) |
+
+#### Database
+
+**V6 Migration:** `tasteless_config` (80 rows), `combat_log`
+**V7 Migration:** `users.noir_last_attempt` (timestamp, nullable)
+**V8 Migration:** `world_vocabulary` (36 Cotton Land entries)
+
+#### Frontend (Phase 14 Food Catcher carried forward)
+- Food Catcher mini-game: 90s timer, 30 FPS, catch/dodge, location-gated (Meadow)
+- `mini-game-controller.py`, `mini-game-renderer.py`, `mini-game-objects.py`
+- Volume screen: `volume-screen-renderer.py`
+- Character movement engine: `character-movement-engine.py`
+- Food sprite manager moved: `state/food-sprite-manager.py` (from display/)
+
+#### File Count Impact
+
+**Backend:** 47 → 95+ files (~8K+ LOC)
+**Frontend:** ~20 → 30+ files (~3K+ LOC)
+**Database:** V1-V8 migrations (was V1-V5)
+
+#### Breaking Changes
+
+None. Services integrated via existing WebSocket handlers, CDI events, message types (mini_game_*, combat_*, shard_*, quest_*, location_*).
+
+#### Documentation Updated
+
+- `docs/codebase-summary.md` — Package tree, new DTOs, entities, services, file counts
+- `docs/system-architecture.md` — Combat flow, shard progression, Noir quest, location unlock, Final Arc diagrams
+- `docs/project-changelog.md` — This entry
+- `docs/project-overview-pdr.md` — Phase 15 section, status → "Phase 15 Complete"
+
+---
 
 ### [Feature] STT Vocabulary Hints — Cotton Land — 2026-02-24
 

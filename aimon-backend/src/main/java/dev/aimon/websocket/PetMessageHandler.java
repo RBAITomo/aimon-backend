@@ -15,6 +15,7 @@ import dev.aimon.service.combat.CombatSessionState;
 import dev.aimon.service.world.LocationService;
 import dev.aimon.service.world.SubLocation;
 import dev.aimon.service.conversation.ConversationSessionManager;
+import dev.aimon.model.PetActionEvent;
 import dev.aimon.service.pet.BadgeService;
 import dev.aimon.service.pet.PetEvolutionService;
 import dev.aimon.service.pet.PetLevelConfig;
@@ -26,8 +27,11 @@ import io.quarkus.arc.ManagedContext;
 import io.smallrye.mutiny.Uni;
 import io.smallrye.mutiny.infrastructure.Infrastructure;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.event.Event;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
+
+import java.util.Set;
 
 /**
  * Handler for pet-related WebSocket messages.
@@ -68,6 +72,9 @@ public class PetMessageHandler {
 
     @Inject
     ObjectMapper objectMapper;
+
+    @Inject
+    Event<PetActionEvent> petActionEvent;
 
     /**
      * Send full pet status to a WebSocket connection.
@@ -459,6 +466,39 @@ public class PetMessageHandler {
             return sendJson(connection, response)
                 .chain(() -> sendPetStatus(userId, connection));
         });
+    }
+
+    private static final Set<String> ALLOWED_PET_ACTIONS = Set.of("unique_food", "quest_complete", "feed", "interact");
+
+    /**
+     * Handle pet_action messages from frontend (badge progress tracking).
+     */
+    public Uni<Void> handlePetAction(String robotId, Long userId, JsonNode message, WebSocketConnection connection) {
+        if (userId == null) {
+            return sendError(connection, "NO_USER", "User ID not found");
+        }
+        String action = message.has("action") ? message.get("action").asText("") : "";
+        int amount = Math.min(message.has("amount") ? message.get("amount").asInt(1) : 1, 1);
+
+        if (!ALLOWED_PET_ACTIONS.contains(action)) {
+            LOG.warnf("Rejected unknown pet_action: %s from user %d", action, userId);
+            return sendError(connection, "INVALID_ACTION", "Unknown action: " + action);
+        }
+
+        return Uni.createFrom().item(() -> {
+            ManagedContext rc = Arc.container().requestContext();
+            boolean activated = !rc.isActive();
+            if (activated) rc.activate();
+            try {
+                LOG.infof("pet_action: user=%d action=%s amount=%d", userId, action, amount);
+                petActionEvent.fire(new PetActionEvent(userId, action, amount));
+                return null;
+            } finally {
+                if (activated) rc.terminate();
+            }
+        })
+        .runSubscriptionOn(Infrastructure.getDefaultWorkerPool())
+        .replaceWithVoid();
     }
 
     /**
